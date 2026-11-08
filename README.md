@@ -26,9 +26,9 @@ The first run installs uv and mlx-lm and asks before downloading the models, abo
 bash ~/Documents/base-model-lab/train.sh
 ```
 
-At the current settings (300 updates, with a snapshot and a held-out score every 25) this takes about 25 minutes. The add-on and its snapshots go in the folder named by `adapter_path` in `config.yaml`, and the output goes to `train-log.txt`. Give each run its own folder: run 1 is `adapters/prose`, and run 2 is set up as `adapters/prose-v2`.
+At the current settings (one pass over the data, which is 185 updates, with a held-out score and a snapshot every 25) this takes about 15 minutes. To train for a different number of passes (epochs) without editing `config.yaml`, add `--epochs`, as in `train.sh --epochs 2`. The add-on and its snapshots go in the folder named by `adapter_path` in `config.yaml`, and the output goes to `train-log.txt`. Give each run its own folder: run 1 is `adapters/prose`, run 2 is `adapters/prose-v2`, and the next run is set up as `adapters/prose-v3`.
 
-**Use the best snapshot.** Find the update with the lowest "val" loss in the log, then turn that snapshot into an add-on. For update 175 of the current run:
+**Pick the add-on.** With the current settings, the learning rate eases to almost nothing by the last update, so the final add-on (named after the run's folder, such as `prose-v3`) is usually the one to use. If the "val" loss in the log was clearly lowest partway through, turn that snapshot into an add-on instead. For update 175 of the current run:
 
 ```
 bash ~/Documents/base-model-lab/pick_checkpoint.sh 175
@@ -59,8 +59,8 @@ The add-on learned to end its reply with the end-of-text token, so the reply sto
 | `start-base-model.sh` | Installs the tools, downloads the models, and starts `mlx_lm.server` on port 8080 through `server_launcher.py`. With no argument it picks the largest base model that fits in memory. Give it a Hugging Face model ID to override that. |
 | `server_launcher.py` | Starts `mlx_lm.server` with the fixes and the scoring described below. |
 | `train.sh` | Checks the setup, refuses to run while the server is up, keeps any earlier add-on by renaming it, then runs `lab_launcher.py` with `config.yaml`. |
-| `lab_launcher.py` | Runs `mlx_lm.lora` with the tokenizer fix and the `User:` / `Assistant:` chat template installed. |
-| `config.yaml` | LoRA settings, with a comment on each line. |
+| `lab_launcher.py` | Runs `mlx_lm.lora` with the tokenizer fix and the `User:` / `Assistant:` chat template installed, and turns `epochs` into `iters`. |
+| `config.yaml` | LoRA settings, with a comment on each line. `epochs` is the lab's own setting: `lab_launcher.py` counts `train.jsonl` and works out mlx-lm's `iters`, so the run stays the same number of passes when the data changes. `train.sh --epochs N` overrides it for one run. |
 | `pick_checkpoint.sh` | Copies one saved snapshot into its own add-on folder, `<run folder>-step<N>/`. |
 | `list_adapters.sh` | Writes `adapters/index.js`, the list behind the playground's add-on menu. The other scripts run it for you. |
 | `data/train.jsonl`, `data/valid.jsonl` | 370 training and 42 held-out conversations, as `{"messages": [...]}` lines. They're generated, so don't edit them by hand. |
@@ -171,6 +171,10 @@ Average training loss was 1.92 over the first pass and 1.08 over the second. It 
 What it means: held-out loss fell steadily through the first pass and jumped as soon as the second began. That's the same memorizing pattern as run 1, easier to see with a score every 25 updates. The best snapshot is update 175 (`pick_checkpoint.sh 175`, giving `adapters/prose-v2-step175`).
 
 These numbers aren't directly comparable with run 1's, because the held-out set grew from 30 to 42 conversations. The starting loss was higher (2.45 against 2.38), probably because the new held-out conversations, like questions about the assistant itself, are harder for the untrained model. To compare the runs, use Show surprise on the same text with each add-on, or compare samples.
+
+### Next run, set up and not yet run
+
+Both runs did best at the end of the first pass through the data: every update before it is on a conversation the model hasn't seen, and every update after it is a repeat. So instead of training longer and picking a snapshot, the config now trains for exactly one pass, or epoch (`epochs: 1`, 185 updates) with a learning rate schedule. It warms up over 10 updates, then eases down along a cosine curve to almost nothing by the last update, so the final add-on is a settled version of "has seen everything once." The peak is 4e-5, twice run 2's constant 2e-5, because easing off roughly halves the average step size. It's the same data as run 2, so this run tests the schedule alone. If it works, the end of training is the add-on to use, with no snapshot to pick. Its held-out loss is directly comparable with run 2's.
 
 ## Ideas for what's next
 

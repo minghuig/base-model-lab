@@ -4,12 +4,37 @@
 # Run it in Terminal with:
 #   bash ~/Documents/base-model-lab/train.sh
 #
+# To train for a different number of epochs (passes over the training data)
+# than config.yaml says, add --epochs, for example:
+#   bash ~/Documents/base-model-lab/train.sh --epochs 2
+#
 # Everything it makes stays in this folder: the add-on goes in the folder named
 # by adapter_path in config.yaml, and a copy of the output goes in train-log.txt.
 
 set -euo pipefail
 cd "$(dirname "$0")"
 export PATH="$HOME/.local/bin:$PATH"
+
+usage() {
+  echo "Usage: bash train.sh [--epochs N]"
+  echo "  --epochs N   train for N passes over the training data instead of what"
+  echo "               config.yaml says (N can be a fraction, like 0.5)"
+}
+EPOCHS=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --epochs|--passes)
+      if [ $# -lt 2 ]; then usage; exit 1; fi
+      EPOCHS="$2"; shift 2 ;;
+    --epochs=*|--passes=*) EPOCHS="${1#*=}"; shift ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1"; usage; exit 1 ;;
+  esac
+done
+if [ -n "$EPOCHS" ] && ! [[ "$EPOCHS" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ && "$EPOCHS" =~ [1-9] ]]; then
+  echo "--epochs needs a number above zero, like 1, 2 or 0.5 (got: $EPOCHS)"
+  exit 1
+fi
 
 PORT=8080
 MODEL="mlx-community/Meta-Llama-3.1-8B-4bit"
@@ -64,7 +89,7 @@ and loud; that's normal.
 
 GUIDE
 
-"$TOOL_PY" lab_launcher.py --config config.yaml 2>&1 | tee train-log.txt
+"$TOOL_PY" lab_launcher.py --config config.yaml ${EPOCHS:+--epochs "$EPOCHS"} 2>&1 | tee train-log.txt
 bash list_adapters.sh > /dev/null
 
 cat <<EOF
@@ -79,7 +104,9 @@ Done. To try it in the playground:
 
      Assistant:
 
-If Val loss was lowest partway through, use that snapshot instead. For example,
-for update 100, run  bash ~/Documents/base-model-lab/pick_checkpoint.sh 100
+The learning rate eases off toward the end, so the final add-on is usually the
+one to use. If Val loss was clearly lowest partway through, use that snapshot
+instead. For example, for update 150, run
+  bash ~/Documents/base-model-lab/pick_checkpoint.sh 150
 and pick the new add-on from the menu.
 EOF

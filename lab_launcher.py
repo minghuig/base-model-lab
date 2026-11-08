@@ -26,8 +26,13 @@ It also applies the same tokenizer fix as the playground server: some model
 conversions end every prompt with an end-of-document token or leave off the
 start token.
 
+It also reads one setting mlx-lm doesn't have: "epochs" in config.yaml, the
+number of passes over the training data, which --epochs N overrides. It works
+out the matching number of updates, so the run stays the right length when
+the dataset changes.
+
 Usage (train.sh runs this for you):
-    python lab_launcher.py --config config.yaml
+    python lab_launcher.py --config config.yaml [--epochs N]
 """
 
 import sys
@@ -82,8 +87,68 @@ def _init(self, tokenizer, *args, **kwargs):
 
 tu.TokenizerWrapper.__init__ = _init
 
+def resolve_epochs(config_path, override=None):
+    """Turns the lab's "epochs" setting into mlx-lm's "iters".
+
+    One pass is every training conversation once: the number of lines in
+    train.jsonl divided by batch_size, rounded up. If lr_schedule's arguments
+    say "auto" for the number of decay steps, that becomes the updates left
+    after warmup, so the learning rate reaches its end value on the last
+    update. Returns the path of a resolved copy of the config, or the original
+    path if there's nothing to resolve.
+    """
+    import math
+    import os
+    import tempfile
+
+    import yaml
+    from mlx_lm.lora import yaml_loader
+
+    with open(config_path) as f:
+        config = yaml.load(f, yaml_loader)
+    epochs = config.pop("epochs", None)
+    if override is not None:
+        epochs = override
+    if epochs is None:
+        return config_path
+    epochs = float(epochs)
+    if epochs <= 0:
+        raise SystemExit("epochs needs to be above zero.")
+
+    data = os.path.join(os.path.dirname(os.path.abspath(config_path)), config.get("data", "data"), "train.jsonl")
+    with open(data) as f:
+        n = sum(1 for line in f if line.strip())
+    batch = int(config.get("batch_size", 4))
+    per_pass = math.ceil(n / batch)
+    iters = max(1, int(round(epochs * per_pass)))
+    config["iters"] = iters
+
+    schedule = config.get("lr_schedule")
+    if schedule and "auto" in schedule.get("arguments", []):
+        steps = max(1, iters - int(schedule.get("warmup", 0)))
+        schedule["arguments"] = [steps if a == "auto" else a for a in schedule["arguments"]]
+
+    print(f"One epoch (a pass over all {n} training conversations, {batch} per update) is {per_pass} updates. "
+          f"Training for {epochs:g} epoch{'' if epochs == 1 else 's'}: {iters} updates.")
+    fd, path = tempfile.mkstemp(prefix="lab-config-", suffix=".yaml")
+    with os.fdopen(fd, "w") as f:
+        yaml.safe_dump(config, f)
+    return path
+
+
 if __name__ == "__main__":
     from mlx_lm.lora import main
 
-    sys.argv = ["mlx_lm.lora"] + sys.argv[1:]
+    args = sys.argv[1:]
+    override = None
+    if "--epochs" in args:
+        i = args.index("--epochs")
+        override = args[i + 1]
+        del args[i:i + 2]
+    if "--config" in args:
+        i = args.index("--config") + 1
+        args[i] = resolve_epochs(args[i], override)
+    elif override is not None:
+        raise SystemExit("--epochs needs a --config file to adjust.")
+    sys.argv = ["mlx_lm.lora"] + args
     main()

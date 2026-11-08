@@ -16,7 +16,9 @@ patches, and results so far.
   trained. Add new batches with a higher number so earlier held-out
   conversations stay put.
 - Give each training run its own adapter_path in config.yaml (adapters/prose,
-  adapters/prose-v2, ...). pick_checkpoint.sh and list_adapters.sh keep the
+  adapters/prose-v2, ...). Run length is set by "epochs" (or
+  train.sh --epochs N), which lab_launcher.py turns into mlx-lm's "iters" (and
+  the lr_schedule's "auto" decay steps); don't set iters by hand. pick_checkpoint.sh and list_adapters.sh keep the
   playground's add-on menu in sync.
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.
