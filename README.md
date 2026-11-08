@@ -6,7 +6,7 @@ It has three parts:
 
 - **A playground** (`base-model-playground.html`). You write the start of a document and a base model continues it. It talks to a server on this Mac, to OpenRouter, or to Featherless. With the local server it can also show how surprised the model was by each token of a text.
 - **A local server** (`start-base-model.sh`). It runs mlx-lm's server with Mistral Nemo 12B base and Llama 3.1 8B base. The playground can switch between them.
-- **A fine-tune** (`train.sh` and friends). A LoRA add-on teaches Llama 3.1 8B base to answer as an assistant whose writing is genuinely good. It trains on 412 conversations written for this, some of them several turns long.
+- **A fine-tune** (`train.sh` and friends). A LoRA add-on teaches Llama 3.1 8B base to answer as an assistant whose writing is genuinely good. It trains on 438 conversations written for this, some of them several turns long.
 
 ## Quick start
 
@@ -18,7 +18,7 @@ bash ~/Documents/base-model-lab/start-base-model.sh
 
 The first run installs uv and mlx-lm and asks before downloading the models, about 12 GB for both. Leave that window open. Then open `base-model-playground.html` in Safari or Chrome and choose **Provider: Server on this Mac**.
 
-**See what the model expected.** Select some text in the document, or nothing for all of it, and press **Show surprise**. Each token is colored by the probability the model gave it, given everything before it. Point at a token to see the model's top guesses for that spot. The end shows the chance the document ends right there. With a trained add-on picked, you get the model with and without it side by side. This is the quantity training scores: the loss is the average of minus the log of these probabilities over a reply.
+**See what the model expected.** Press **Show surprise**. With nothing selected, it scores the text the model wrote in the document and shows yours in gray for context, without counting it, the way training only scores the reply. Select some text to score exactly that instead (up to about 4,000 tokens of document). Each token is colored by the probability the model gave it, given everything before it. Point at a token to see the model's top guesses for that spot. The end shows the chance the document ends right there. With a trained add-on picked, you get the model with and without it side by side. This is the quantity training scores: the loss is the average of minus the log of these probabilities over a reply.
 
 **Train the add-on.** First stop the server with Control-C in its window, because training needs the memory. Then run:
 
@@ -26,7 +26,7 @@ The first run installs uv and mlx-lm and asks before downloading the models, abo
 bash ~/Documents/base-model-lab/train.sh
 ```
 
-At the current settings (one pass over the data, which is 185 updates, with a held-out score and a snapshot every 25) this takes about 15 minutes. To train for a different number of passes (epochs) without editing `config.yaml`, add `--epochs`, as in `train.sh --epochs 2`. The add-on and its snapshots go in the folder named by `adapter_path` in `config.yaml`, and the output goes to `train-log.txt`. Give each run its own folder: run 1 is `adapters/prose`, run 2 is `adapters/prose-v2`, and the next run is set up as `adapters/prose-v3`.
+At the current settings (one pass over the data, which is 197 updates, with a held-out score and a snapshot every 25) this takes about 15 minutes. To train for a different number of passes (epochs) without editing `config.yaml`, add `--epochs`, as in `train.sh --epochs 2`. The add-on and its snapshots go in the folder named by `adapter_path` in `config.yaml`, and the output goes to `train-log.txt`. Give each run its own folder: run 1 is `adapters/prose`, run 2 is `adapters/prose-v2`, and the next run is set up as `adapters/prose-v3`.
 
 **Pick the add-on.** With the current settings, the learning rate eases to almost nothing by the last update, so the final add-on (named after the run's folder, such as `prose-v3`) is usually the one to use. If the "val" loss in the log was clearly lowest partway through, turn that snapshot into an add-on instead. For update 175 of the current run:
 
@@ -63,8 +63,8 @@ The add-on learned to end its reply with the end-of-text token, so the reply sto
 | `config.yaml` | LoRA settings, with a comment on each line. `epochs` is the lab's own setting: `lab_launcher.py` counts `train.jsonl` and works out mlx-lm's `iters`, so the run stays the same number of passes when the data changes. `train.sh --epochs N` overrides it for one run. |
 | `pick_checkpoint.sh` | Copies one saved snapshot into its own add-on folder, `<run folder>-step<N>/`. |
 | `list_adapters.sh` | Writes `adapters/index.js`, the list behind the playground's add-on menu. The other scripts run it for you. |
-| `data/train.jsonl`, `data/valid.jsonl` | 370 training and 42 held-out conversations, as `{"messages": [...]}` lines. They're generated, so don't edit them by hand. |
-| `dataset_src/` | The conversations in fourteen batches by category, plus `build_dataset.py`, which runs quality checks and writes `data/`. |
+| `data/train.jsonl`, `data/valid.jsonl` | 393 training and 45 held-out conversations, as `{"messages": [...]}` lines. They're generated, so don't edit them by hand. |
+| `dataset_src/` | The conversations in fifteen batches by category, plus `build_dataset.py`, which runs quality checks and writes `data/`. |
 | `runs/` | Logs from past training runs. The table under "Results so far" summarizes them. |
 
 These are git-ignored: `adapters/`, where each snapshot is about 42 MB (`index.js` in there has this Mac's paths), and `train-log.txt`, which is overwritten on every run.
@@ -96,7 +96,7 @@ Both launchers patch mlx-lm at startup. The server's patches are in `server_laun
 1. **Start- and end-of-document tokens.** The mlx-community conversion of Mistral Nemo base appended `</s>` (end of document) to every prompt. The model was being asked to continue a document it had just been told was over. That's why replies were often in a random language, like the run that answered only in Arabic. The Llama 3.1 8B conversion had the opposite problem: it added no `<|begin_of_text|>`. The patch replaces the tokenizer's post-processor so every prompt starts with the start-of-document token and doesn't end with an end-of-document one. Training gets the same fix, so the add-on sees prompts the way the server sends them.
 2. **The first word's leading space.** mlx_lm.server's streaming detokenizer trims the space before the first generated token. In a completion, that glued the continuation onto the prompt. The server patch turns the trim off.
 3. **Chat template (training only).** `lab_launcher.py` gives the tokenizer the template above, so mlx_lm.lora's chat-formatting path produces our format.
-4. **Scoring (server only).** A `/v1/completions` request carrying `"lab_score": "<text>"` doesn't generate anything. It returns, for each token of that text, the probability the model gave it after the request's `prompt`, its rank, the model's top 5 guesses, and the probability that the document ends right after the text. The request goes through the server's own queue (a seed marks it as not batchable, which routes it to the single-request path on the generation thread). So it waits for any generation in progress and loads the requested model and add-on exactly as a normal request would.
+4. **Scoring (server only).** A `/v1/completions` request carrying `"lab_score": "<text>"` doesn't generate anything. It returns, for each token of that text, the probability the model gave it after the request's `prompt`, its rank, the model's top 5 guesses, and the probability that the document ends right after the text. The model reads the document in chunks of 256 tokens, carrying its cache forward, so memory stays small; prompt plus text can be up to 4,096 tokens. The request goes through the server's own queue (a seed marks it as not batchable, which routes it to the single-request path on the generation thread). So it waits for any generation in progress and loads the requested model and add-on exactly as a normal request would.
 
 One related quirk: stop strings that begin with a newline (such as `"\nUser:"`) didn't fire reliably with mlx_lm.server. The playground's starters use `User:` and `Q:` instead.
 
@@ -104,7 +104,7 @@ These patches reach into mlx-lm internals (`TokenizerWrapper`, `BPEStreamingDeto
 
 ## The dataset
 
-The 412 conversations are written in one voice: plain, precise and warm. Length fits the question, from a one-word reply to about 170 words (median about 90). They use no markdown, no em dashes, and none of the stock assistant phrases. The fourteen batches:
+The 438 conversations are written in one voice: plain, precise and warm. Length fits the question, from a one-word reply to about 170 words (median about 90). They use no markdown, no em dashes, and none of the stock assistant phrases. The fifteen batches:
 
 | Batch | Category | Count |
 |---|---|---|
@@ -122,8 +122,9 @@ The 412 conversations are written in one voice: plain, precise and warm. Length 
 | b12 | Questions about the assistant itself | 25 |
 | b13 | Things it can't see or know | 20 |
 | b14 | Short exchanges and conversation endings | 15 |
+| b15 | Personal-sounding questions that should just be answered | 26 |
 
-Batches b11 to b14 were added for run 2, aimed at what run 1 got wrong (see "Results so far"). Each batch file starts with a comment saying what it's for.
+Batches b11 to b14 were added for run 2, aimed at what run 1 got wrong, and b15 for the run after it, aimed at an overcorrection in run 2 (see "Results so far"). Each batch file starts with a comment saying what it's for.
 
 `build_dataset.py` holds out three conversations per batch for validation. The split is seeded and batches are processed in name order, so a rebuild of unchanged batches gives identical files, and adding a batch leaves the earlier batches' held-out conversations unchanged. The 30 from run 1 are still the first 30 lines of `valid.jsonl`. It also reports duplicate prompts, reply lengths, markdown, em dashes, common first words, and a list of banned tics ("delve", "great question", "it's important to note" and so on). After editing a batch, run:
 
@@ -174,7 +175,9 @@ These numbers aren't directly comparable with run 1's, because the held-out set 
 
 ### Next run, set up and not yet run
 
-Both runs did best at the end of the first pass through the data: every update before it is on a conversation the model hasn't seen, and every update after it is a repeat. So instead of training longer and picking a snapshot, the config now trains for exactly one pass, or epoch (`epochs: 1`, 185 updates) with a learning rate schedule. It warms up over 10 updates, then eases down along a cosine curve to almost nothing by the last update, so the final add-on is a settled version of "has seen everything once." The peak is 4e-5, twice run 2's constant 2e-5, because easing off roughly halves the average step size. It's the same data as run 2, so this run tests the schedule alone. If it works, the end of training is the add-on to use, with no snapshot to pick. Its held-out loss is directly comparable with run 2's.
+Playing with run 2's update 175 showed that it fixed the stopping: it ended after its reply instead of making up the next `User:` turn. But it overcorrected on identity. It opened ordinary questions with disclaimers nobody asked for. Asked "what is a delicious food," it said "I don't have a mouth or a stomach, so I can't taste anything, but…", nearly the shape of the b12 pizza example. It also fell back into markdown bullets and stock phrases. Asked for explicit stories, it gave refusals with body-based reasons ("I don't have any sex organs"), and sometimes wrote something story-like anyway. None of the data involves content refusals. The model seems to have combined two things: the base model's picture of how AI assistants answer such requests, and run 2's "I can't X, but I can Y" template. The cause of the overcorrection: 45 conversations showed the assistant stating a limit, and almost none showed a personal-sounding question that should just be answered. A model can't learn where a line is from one side of it. b15 adds that other side. On purpose, there is no training on explicit requests either way. How that behavior shifts as a side effect of the other changes is interesting in itself.
+
+Both runs did best at the end of the first pass through the data: every update before it is on a conversation the model hasn't seen, and every update after it is a repeat. So instead of training longer and picking a snapshot, the config now trains for exactly one pass, or epoch (`epochs: 1`, 197 updates with b15 added) with a learning rate schedule. It warms up over 10 updates, then eases down along a cosine curve to almost nothing by the last update, so the final add-on is a settled version of "has seen everything once." The peak is 4e-5, twice run 2's constant 2e-5, because easing off roughly halves the average step size. This run changes two things at once, the schedule and the b15 data, so a difference from run 2 can't be credited to either one alone. The disclaimer behavior is almost certainly down to the data. If it works, the end of training is the add-on to use, with no snapshot to pick. The held-out set grew by three b15 conversations (45 in all), one of them "what is a delicious food." The earlier 42 are unchanged.
 
 ## Ideas for what's next
 

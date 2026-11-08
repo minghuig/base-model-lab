@@ -211,6 +211,8 @@
   .s-legend .b1 i { background: var(--hot1); } .s-legend .b2 i { background: var(--hot2); }
   .s-legend .b3 i { background: var(--hot3); } .s-legend .b4 i { background: var(--hot4); }
   .s-text .t.hl { outline: 2px solid var(--graphite); outline-offset: 0; }
+  .s-text .t.yours { color: var(--muted); }
+  .s-legend .yours i { background: transparent; border-style: dashed; }
   .s-text .t.nl::before { content: '↵'; color: var(--muted); }
   .s-text .end { font: 12px var(--sans); padding: 1px 6px; margin-left: 6px; border: 1px solid var(--rule); white-space: nowrap; }
   .s-detail { margin: 10px 0 0; font-size: 13px; line-height: 1.55; min-height: 2.8em; }
@@ -317,7 +319,7 @@
           <input id="stops" type="text" spellcheck="false" placeholder="e.g. User:">
         </div>
       </div>
-      <p class="note" id="surpriseNote" hidden><strong>Show surprise</strong> colors the text you’ve selected, or the whole document if nothing is, by how unlikely the model found each token given everything before it. With a trained add-on picked, it shows the model with and without it.</p>
+      <p class="note" id="surpriseNote" hidden><strong>Show surprise</strong> colors each token by how unlikely the model found it, given everything before it. With nothing selected, it scores the model-written text in the document and shows yours in gray for context, the way training only scores the reply. Select some text to score exactly that instead. With a trained add-on picked, it shows the model with and without it.</p>
       <p class="note">“Stop at” takes up to four strings, separated by commas; write a newline as <code>\n</code>. Your key goes straight from this page to the provider you picked and nowhere else.</p>
     </section>
 
@@ -1117,16 +1119,32 @@
     return el;
   }
 
-  function surpriseLegend() {
+  function surpriseLegend(showYours) {
     const el = document.createElement('p');
     el.className = 's-legend';
     el.append('Chance the model gave each token:');
-    for (const [cls, label] of [['b0', '50% or more'], ['b1', '20–50%'], ['b2', '5–20%'], ['b3', '1–5%'], ['b4', 'under 1%']]) {
+    const items = [['b0', '50% or more'], ['b1', '20–50%'], ['b2', '5–20%'], ['b3', '1–5%'], ['b4', 'under 1%']];
+    if (showYours) items.push(['yours', 'gray text: yours, not counted']);
+    for (const [cls, label] of items) {
       const s = document.createElement('span'); s.className = cls;
       const i = document.createElement('i'); s.append(i, label);
       el.appendChild(s);
     }
     return el;
+  }
+
+  // What to score. A selection is scored as is. With nothing selected, the
+  // scored part runs from the first model-written character to the end, and
+  // only tokens that touch model-written text count; your text in between is
+  // shown for context, like the prompt during training.
+  function surpriseRegion() {
+    const doc = ta.value;
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    if (b > a) return { start: a, prompt: doc.slice(0, a), text: doc.slice(a, b), counted: null, what: 'selection' };
+    const model = ranges.filter(([x, y]) => y > x);
+    if (!model.length) return { start: 0, prompt: '', text: doc, counted: null, what: 'document' };
+    const start = model[0][0];
+    return { start, prompt: doc.slice(0, start), text: doc.slice(start), counted: model, what: 'model' };
   }
 
   const surpriseCards = [];
@@ -1178,17 +1196,28 @@
     return card;
   }
 
-  function fillSurpriseCard(card, d) {
+  function fillSurpriseCard(card, d, region) {
     card.data = d;
-    const n = d.tokens.length;
-    const loss = d.tokens.reduce((a, t) => a - t.logprob, 0) / n;
+    // Where each token sits in the document, to tell the model's text from yours.
+    let pos = region.start - (d.overlap || 0);
+    const counts = d.tokens.map((t) => {
+      const a = pos, b = pos + t.text.length;
+      pos = b;
+      if (!region.counted) return true;
+      return region.counted.some(([x, y]) => a < y && b > x);
+    });
+    const scored = d.tokens.filter((t, i) => counts[i]);
+    const n = scored.length;
+    const loss = n ? scored.reduce((a, t) => a - t.logprob, 0) / n : 0;
     const pEnd = Math.exp(d.end.logprob);
-    card.status.textContent = n + (n === 1 ? ' token' : ' tokens');
-    card.sum.textContent = 'Average loss ' + loss.toFixed(2) + ', so a typical token got about a 1-in-' +
-      Math.max(1, Math.round(Math.exp(loss))) + ' chance. Chance the document ends right after this: ' + pct(pEnd) + '.';
+    const whose = region.what === 'model' ? ' the model wrote' : '';
+    card.status.textContent = n + (n === 1 ? ' token' : ' tokens') + whose;
+    card.sum.textContent = (n
+      ? 'Average loss ' + loss.toFixed(2) + ', so a typical token' + whose + ' got about a 1-in-' + Math.max(1, Math.round(Math.exp(loss))) + ' chance. '
+      : '') + 'Chance the document ends right after this: ' + pct(pEnd) + '.';
     d.tokens.forEach((t, i) => {
       const el = document.createElement('span');
-      el.className = 't ' + bucket(Math.exp(t.logprob)) + (t.text.includes('\n') ? ' nl' : '');
+      el.className = 't ' + (counts[i] ? bucket(Math.exp(t.logprob)) : 'yours') + (t.text.includes('\n') ? ' nl' : '');
       el.dataset.i = String(i);
       el.textContent = t.text;
       card.text.appendChild(el);
@@ -1234,12 +1263,12 @@
     const adapter = currentAdapter();
     if (adapter && !model) { keyMsg.textContent = 'Pick the model this add-on was trained on.'; focusModel(); return; }
     if (adapter && !adapter.startsWith('/')) { keyMsg.textContent = 'Use the add-on folder’s full path, starting with /Users/.'; return; }
-    const a = ta.selectionStart, b = ta.selectionEnd;
+    const region = surpriseRegion();
     const o = {
       cfg, provider: 'local', model, adapter,
       base: (baseUrlEl.value.trim() || cfg.defaultBase).replace(/\/+$/, ''),
-      prompt: b > a ? ta.value.slice(0, a) : '',
-      text: b > a ? ta.value.slice(a, b) : ta.value,
+      prompt: region.prompt,
+      text: region.text,
     };
     if (!o.text) { ta.focus(); return; }
     keyMsg.textContent = '';
@@ -1254,7 +1283,7 @@
     emptyEl.hidden = true;
     showPanel('surprise');
     setRunning(true);
-    samplesBox.appendChild(surpriseLegend());
+    samplesBox.appendChild(surpriseLegend(!!region.counted && region.text.length > region.counted.reduce((a, [x, y]) => a + y - x, 0)));
     const modelName = (modelSelect.selectedOptions[0] && modelSelect.value !== CUSTOM ? modelSelect.selectedOptions[0].textContent : model) || 'The server’s model';
     const runs = adapter
       ? [[adapter, modelName + ' + ' + baseName(adapter)], ['', modelName + ', no add-on']]
@@ -1266,7 +1295,7 @@
       try {
         const d = await scoreOne(o, runs[k][0]);
         if (ctl.signal.aborted) { cards[k].status.textContent = 'Stopped'; continue; }
-        fillSurpriseCard(cards[k], d);
+        fillSurpriseCard(cards[k], d, region);
       } catch (e) {
         cards[k].el.classList.add('error');
         cards[k].status.textContent = 'Failed';

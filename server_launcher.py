@@ -72,7 +72,8 @@ except Exception as e:
 # 3. Scoring. The request goes through the server's own queue, so it runs on the
 # generation thread, after any generation in progress, with the requested model
 # and add-on loaded exactly as a normal request would load them.
-MAX_SCORE_TOKENS = 1500
+MAX_SCORE_TOKENS = 4096
+CHUNK = 256
 TOP_K = 5
 
 try:
@@ -81,6 +82,7 @@ try:
 
     import mlx.core as mx
     import mlx_lm.server as srv
+    from mlx_lm.models.cache import make_prompt_cache
 
     def _score(model, tokenizer, prompt, text, stream):
         prompt_ids = list(tokenizer.encode(prompt))
@@ -97,23 +99,42 @@ try:
         if start >= len(full_ids):
             raise ValueError("There's no text to score.")
 
+        # The model reads the tokens in chunks, carrying a cache forward, so
+        # memory stays small however long the document is. Position i predicts
+        # token i + 1, so the scored part needs the outputs from position
+        # start - 1 through the last one, which predicts what would come after
+        # the text. Everything before that only has to pass through the cache.
+        eos_ids = sorted(getattr(tokenizer, "eos_token_ids", None) or [tokenizer.eos_token_id])
+        actual, ranks, top_ids, top_lps = [], [], [], []
         with mx.stream(stream):
-            logits = model(mx.array(full_ids)[None])[0]
-            # Position i predicts token i + 1; the last position predicts what
-            # would come after the text.
-            logits = logits[start - 1:].astype(mx.float32)
-            logprobs = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
-            targets = mx.array(full_ids[start:])
-            actual = mx.take_along_axis(logprobs[:-1], targets[:, None], axis=-1)[:, 0]
-            ranks = (logprobs[:-1] > actual[:, None]).sum(axis=-1) + 1
-            top_ids = mx.argpartition(-logprobs, kth=TOP_K - 1, axis=-1)[:, :TOP_K]
-            top_lps = mx.take_along_axis(logprobs, top_ids, axis=-1)
-            eos_ids = sorted(getattr(tokenizer, "eos_token_ids", None) or [tokenizer.eos_token_id])
-            end_lp = mx.logsumexp(logprobs[-1][mx.array(eos_ids)])
-            mx.eval(actual, ranks, top_ids, top_lps, end_lp)
-
-        actual, ranks = actual.tolist(), ranks.tolist()
-        top_ids, top_lps = top_ids.tolist(), top_lps.tolist()
+            cache = make_prompt_cache(model)
+            before = full_ids[: start - 1]
+            for i in range(0, len(before), CHUNK):
+                model(mx.array(before[i : i + CHUNK])[None], cache=cache)
+                mx.eval([c.state for c in cache])
+            rest = full_ids[start - 1 :]
+            for i in range(0, len(rest), CHUNK):
+                chunk = rest[i : i + CHUNK]
+                logits = model(mx.array(chunk)[None], cache=cache)[0].astype(mx.float32)
+                logprobs = logits - mx.logsumexp(logits, axis=-1, keepdims=True)
+                ids = mx.argpartition(-logprobs, kth=TOP_K - 1, axis=-1)[:, :TOP_K]
+                lps = mx.take_along_axis(logprobs, ids, axis=-1)
+                targets = rest[i + 1 : i + 1 + len(chunk)]  # one short in the last chunk
+                n_t = len(targets)
+                if n_t:
+                    t = mx.array(targets)[:, None]
+                    a = mx.take_along_axis(logprobs[:n_t], t, axis=-1)[:, 0]
+                    r = (logprobs[:n_t] > a[:, None]).sum(axis=-1) + 1
+                    mx.eval(a, r)
+                    actual += a.tolist()
+                    ranks += r.tolist()
+                if n_t < len(chunk):
+                    end_lp = mx.logsumexp(logprobs[-1][mx.array(eos_ids)])
+                    mx.eval(end_lp)
+                mx.eval(ids, lps, [c.state for c in cache])
+                top_ids += ids.tolist()
+                top_lps += lps.tolist()
+                del logits, logprobs
 
         def decode(ids):
             try:
@@ -124,15 +145,22 @@ try:
         def tok_text(i):
             return decode([i])
 
+        # Each token's text is what decoding gains when it's added. Decoding a
+        # few tokens of left context, rather than the whole document each time,
+        # keeps this fast on long documents.
         tokens = []
-        prev = decode(full_ids[:start])
+        pending = start  # first token whose text hasn't been assigned yet
         for k, j in enumerate(range(start, len(full_ids))):
-            cur = decode(full_ids[: j + 1])
+            a = max(0, pending - 4)
+            left = decode(full_ids[a:pending])
+            cur = decode(full_ids[a : j + 1])
             if cur.endswith("�"):
                 piece = ""  # part of a character that the next token finishes
             else:
-                piece = cur[len(prev):]
-                prev = cur
+                if not cur.startswith(left):
+                    left, cur = decode(full_ids[:pending]), decode(full_ids[: j + 1])
+                piece = cur[len(left):]
+                pending = j + 1
             alts = sorted(zip(top_lps[k], top_ids[k]), reverse=True)
             tokens.append({
                 "text": piece,
