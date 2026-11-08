@@ -142,66 +142,14 @@ echo "to switch between the downloaded models."
 echo "Leave this window open while you play. Press Control-C here to stop the server."
 echo ""
 
-# This starts the same mlx_lm.server with two fixes for continuing documents:
-#
-# 1. The server drops the space before the first word it sends back. That suits
-#    chat replies, but here it glues the first word onto your text
-#    ("species of" + " owl" comes back as "species ofowl").
-# 2. Some model conversions get the special tokens wrong. mlx-community's
-#    Mistral Nemo puts an end-of-document token after every prompt, so the
-#    model thinks your document is finished and starts a new, unrelated one;
-#    its Llama 3.1 8B leaves off the start-of-document token the model was
-#    trained with.
-LAUNCHER=$(cat <<'PY'
-import sys
-import mlx_lm.tokenizer_utils as tu
-
-try:
-    tu.BPEStreamingDetokenizer._maybe_trim_space = lambda self, text: text
-    _spm_init = tu.SPMStreamingDetokenizer.__init__
-    tu.SPMStreamingDetokenizer.__init__ = (
-        lambda self, tokenizer, trim_space=True: _spm_init(self, tokenizer, trim_space=False)
-    )
-except Exception as e:
-    print(f"(Couldn't keep the first word's leading space: {e})")
-
-try:
-    from tokenizers.processors import TemplateProcessing
-    _wrapper_init = tu.TokenizerWrapper.__init__
-
-    def _init(self, tokenizer, *args, **kwargs):
-        _wrapper_init(self, tokenizer, *args, **kwargs)
-        try:
-            eos, bos = tokenizer.eos_token_id, tokenizer.bos_token_id
-            backend = getattr(tokenizer, "_tokenizer", None)
-            ids = tokenizer.encode("a")
-            ends_with_eos = eos is not None and ids and ids[-1] == eos
-            missing_bos = bos is not None and (not ids or ids[0] != bos)
-            if backend is None or not (ends_with_eos or missing_bos):
-                return
-            if bos is not None:
-                b = tokenizer.bos_token
-                backend.post_processor = TemplateProcessing(
-                    single=f"{b} $A", pair=f"{b} $A {b} $B", special_tokens=[(b, bos)]
-                )
-            else:
-                backend.post_processor = TemplateProcessing(single="$A", pair="$A $B")
-            print("(Fixed this model's tokenizer so prompts start with a start-of-document token and don't end with an end-of-document one.)")
-        except Exception as e:
-            print(f"(Couldn't check the tokenizer's end-of-document setting: {e})")
-
-    tu.TokenizerWrapper.__init__ = _init
-except Exception as e:
-    print(f"(Couldn't patch the tokenizer: {e})")
-
-from mlx_lm.server import main
-sys.argv = ["mlx_lm.server"] + sys.argv[1:]
-main()
-PY
-)
-
+# This starts the same mlx_lm.server with the lab's fixes and additions from
+# server_launcher.py, next to this script: it keeps the first word's leading
+# space, fixes start- and end-of-document tokens, and adds the scoring behind
+# the playground's "Show surprise" button. See the notes at the top of that file.
+HERE="$(cd "$(dirname "$0")" && pwd)"
 TOOL_PY="$(uv tool dir 2>/dev/null)/mlx-lm/bin/python"
-if [ -x "$TOOL_PY" ]; then
-  exec "$TOOL_PY" -c "$LAUNCHER" --model "$MODEL" --port "$PORT"
+if [ -x "$TOOL_PY" ] && [ -f "$HERE/server_launcher.py" ]; then
+  exec "$TOOL_PY" "$HERE/server_launcher.py" --model "$MODEL" --port "$PORT"
 fi
+echo "(Starting the plain server, without the lab's fixes: server_launcher.py or mlx-lm's own Python wasn't found.)"
 exec mlx_lm.server --model "$MODEL" --port "$PORT"

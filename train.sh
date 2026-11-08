@@ -4,8 +4,8 @@
 # Run it in Terminal with:
 #   bash ~/Documents/base-model-lab/train.sh
 #
-# Everything it makes stays in this folder: the add-on goes in adapters/prose,
-# and a copy of the output goes in train-log.txt.
+# Everything it makes stays in this folder: the add-on goes in the folder named
+# by adapter_path in config.yaml, and a copy of the output goes in train-log.txt.
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -13,7 +13,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 PORT=8080
 MODEL="mlx-community/Meta-Llama-3.1-8B-4bit"
-ADAPTER_DIR="adapters/prose"
+ADAPTER_DIR="$(sed -n 's/^adapter_path:[[:space:]]*\([^[:space:]#]*\).*/\1/p' config.yaml)"
+ADAPTER_DIR="${ADAPTER_DIR:-adapters/prose}"
 
 if ! command -v uv >/dev/null 2>&1; then
   echo "mlx-lm isn't installed yet. Run  bash ~/Documents/base-model-lab/start-base-model.sh  once first,"
@@ -53,10 +54,10 @@ cat <<'GUIDE'
 Starting training. What to watch:
   - Every 10 updates it prints "Train loss": how surprised the model is by the
     replies it's training on. It should fall quickly at first, then level off.
-  - Every 50 updates it prints "Val loss": the same score on the 30 held-out
+  - Every 25 updates it prints "Val loss": the same score on the 42 held-out
     conversations it never trains on. This is the honest one.
   - If Val loss starts rising while Train loss keeps falling, the model has
-    started memorizing its examples. A snapshot is saved every 50 updates, so
+    started memorizing its examples. A snapshot is saved every 25 updates, so
     we can go back to the best one.
 The first few updates are slower while things warm up. Your Mac may get warm
 and loud; that's normal.
@@ -64,14 +65,14 @@ and loud; that's normal.
 GUIDE
 
 "$TOOL_PY" lab_launcher.py --config config.yaml 2>&1 | tee train-log.txt
+bash list_adapters.sh > /dev/null
 
 cat <<EOF
 
 Done. To try it in the playground:
   1. Start the server:   bash ~/Documents/base-model-lab/start-base-model.sh
-  2. In the playground, choose Provider: Server on this Mac
-     Model:          mlx-community/Meta-Llama-3.1-8B-4bit
-     Trained add-on: $(pwd)/$ADAPTER_DIR
+  2. In the playground, choose Provider: Server on this Mac, then pick
+     $(basename "$ADAPTER_DIR") from the Trained add-on menu. That also picks the model.
   3. Write a prompt like this, ending with "Assistant:" and no stop string:
 
      User: what's a fun activity i can do today?
@@ -80,5 +81,5 @@ Done. To try it in the playground:
 
 If Val loss was lowest partway through, use that snapshot instead. For example,
 for update 100, run  bash ~/Documents/base-model-lab/pick_checkpoint.sh 100
-and use the folder it prints as the Trained add-on.
+and pick the new add-on from the menu.
 EOF

@@ -19,6 +19,10 @@
     --on-ink: #FFFFFF;
     --select: rgba(43, 55, 207, .20);
     --danger: #A8261C;
+    --hot1: rgba(224, 112, 27, .16);
+    --hot2: rgba(224, 112, 27, .32);
+    --hot3: rgba(214, 70, 24, .48);
+    --hot4: rgba(200, 30, 20, .62);
     --mono: "Spline Sans Mono", ui-monospace, Menlo, Consolas, monospace;
     --sans: "Spline Sans", system-ui, -apple-system, sans-serif;
     color-scheme: light dark;
@@ -35,6 +39,10 @@
       --on-ink: #10132A;
       --select: rgba(158, 168, 255, .25);
       --danger: #FF8E84;
+      --hot1: rgba(255, 150, 70, .16);
+      --hot2: rgba(255, 140, 60, .30);
+      --hot3: rgba(255, 110, 60, .46);
+      --hot4: rgba(255, 80, 70, .62);
     }
   }
 
@@ -86,7 +94,9 @@
   .frame-note[hidden], .field[hidden], .check[hidden] { display: none; }
   #provider { min-width: 150px; }
   #baseUrl { width: min(230px, 80vw); }
+  #adapterSelect { max-width: min(260px, 80vw); }
   #adapter { width: min(260px, 80vw); }
+  #adapter[hidden] { display: none; }
   .provider-note { flex-basis: 100%; margin: -2px 0 0; font-size: 13px; color: var(--muted); max-width: 110ch; }
   .provider-note:empty { display: none; }
   .provider-note code { font: 12.5px var(--mono); color: var(--graphite); }
@@ -188,6 +198,25 @@
   .sample-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
   .status { font-size: 12.5px; color: var(--muted); margin-right: auto; }
 
+  /* Surprise view */
+  .s-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 18px; font-size: 12.5px; color: var(--muted); }
+  .s-legend i { display: inline-block; width: 14px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 5px; border: 1px solid var(--rule); }
+  .s-legend .b0 i { background: transparent; }
+  .sample.surprise { border-left-color: var(--hot3); }
+  .s-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 0 0 2px; }
+  .s-head strong { font: 600 14px var(--sans); }
+  .s-sum { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
+  .s-text .t { border-radius: 3px; cursor: pointer; }
+  .t.b1 { background: var(--hot1); } .t.b2 { background: var(--hot2); } .t.b3 { background: var(--hot3); } .t.b4 { background: var(--hot4); }
+  .s-legend .b1 i { background: var(--hot1); } .s-legend .b2 i { background: var(--hot2); }
+  .s-legend .b3 i { background: var(--hot3); } .s-legend .b4 i { background: var(--hot4); }
+  .s-text .t.hl { outline: 2px solid var(--graphite); outline-offset: 0; }
+  .s-text .t.nl::before { content: '↵'; color: var(--muted); }
+  .s-text .end { font: 12px var(--sans); padding: 1px 6px; margin-left: 6px; border: 1px solid var(--rule); white-space: nowrap; }
+  .s-detail { margin: 10px 0 0; font-size: 13px; line-height: 1.55; min-height: 2.8em; }
+  .s-detail .tok { font: 12.5px var(--mono); background: var(--sheet); border: 1px solid var(--rule); border-radius: 3px; padding: 0 4px; white-space: pre; }
+  .s-detail .hint { color: var(--muted); }
+
   @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
 
   @media (max-width: 860px) {
@@ -235,8 +264,11 @@
         </div>
       </div>
       <div class="field" id="adapterField" hidden>
-        <label class="lbl" for="adapter">Trained add-on (optional)</label>
-        <input id="adapter" type="text" spellcheck="false" placeholder="Full folder path">
+        <label class="lbl" for="adapterSelect">Trained add-on</label>
+        <div class="model-wrap">
+          <select id="adapterSelect"></select>
+          <input id="adapter" type="text" spellcheck="false" placeholder="Full folder path" aria-label="Add-on folder path" hidden>
+        </div>
       </div>
       <p class="key-msg" id="keyMsg" role="alert"></p>
     </div>
@@ -266,6 +298,7 @@
         <div class="actions">
           <button class="primary" id="go" type="button">Continue<span class="kbd" id="kbd"></span></button>
           <button id="stop" type="button" disabled>Stop</button>
+          <button id="surprise" type="button" title="Color each token of the selected text, or the whole document, by how unlikely the model found it">Show surprise</button>
         </div>
         <div class="field">
           <label class="lbl" for="temp">Temperature</label>
@@ -284,11 +317,12 @@
           <input id="stops" type="text" spellcheck="false" placeholder="e.g. User:">
         </div>
       </div>
+      <p class="note" id="surpriseNote" hidden><strong>Show surprise</strong> colors the text you’ve selected, or the whole document if nothing is, by how unlikely the model found each token given everything before it. With a trained add-on picked, it shows the model with and without it.</p>
       <p class="note">“Stop at” takes up to four strings, separated by commas; write a newline as <code>\n</code>. Your key goes straight from this page to the provider you picked and nowhere else.</p>
     </section>
 
     <section class="samples-col" aria-label="Continuations" aria-live="polite">
-      <h2>Continuations</h2>
+      <h2 id="panelTitle">Continuations</h2>
       <p class="sub" id="samplesSub">Each sample is a separate run of the same document.</p>
       <p class="empty" id="empty">Nothing here yet. Write the start of a document, or pick a starter, then press Continue.</p>
       <div id="samples"></div>
@@ -346,7 +380,7 @@
         ['mlx-community/Qwen2.5-32B-4bit', 'Qwen 2.5 32B base (needs 32 GB of memory)'],
         ['mlx-community/Meta-Llama-3.1-70B-4bit', 'Llama 3.1 70B base (needs 64 GB of memory)'],
       ],
-      note: 'For models running on this Mac. Start the server first by running <code>bash ~/Documents/base-model-lab/start-base-model.sh</code> in Terminal, and leave that window open. Pick a model to switch; the first continuation after a switch waits a few seconds while it loads. To use a trained add-on, pick the model it was trained on and paste the add-on folder’s full path.',
+      note: 'For models running on this Mac. Start the server first by running <code>bash ~/Documents/base-model-lab/start-base-model.sh</code> in Terminal, and leave that window open. Pick a model to switch; the first continuation after a switch waits a few seconds while it loads. The Trained add-on menu lists the add-ons in the lab’s <code>adapters</code> folder, and picking one also picks the model it was trained on. For an add-on stored somewhere else, choose Other folder.',
     },
   };
 
@@ -380,9 +414,16 @@
   function focusModel() {
     (modelSelect.value === CUSTOM ? modelEl : modelSelect).focus();
   }
-  const adapterField = $('#adapterField'), adapterEl = $('#adapter');
+  const adapterField = $('#adapterField'), adapterEl = $('#adapter'), adapterSelect = $('#adapterSelect');
+  const OTHER_ADAPTER = '__other__';
+
+  // The add-on menu, plus a text box that appears when "Other folder…" is picked.
+  function currentAdapter() {
+    return adapterSelect.value === OTHER_ADAPTER ? adapterEl.value.trim() : adapterSelect.value;
+  }
   const tempEl = $('#temp'), tempOut = $('#tempOut'), maxEl = $('#max'), nEl = $('#n'), stopEl = $('#stops');
   const goBtn = $('#go'), stopBtn = $('#stop'), samplesBox = $('#samples'), emptyEl = $('#empty'), wsHint = $('#wsHint');
+  const surpriseBtn = $('#surprise'), surpriseNote = $('#surpriseNote'), panelTitle = $('#panelTitle'), samplesSub = $('#samplesSub');
 
   // ---------- storage (best effort) ----------
   const store = {
@@ -570,7 +611,7 @@
     settings.models[providerEl.value] = currentModel();
     if (providerEl.value === 'local') {
       settings.localUrl = baseUrlEl.value.trim();
-      settings.adapter = adapterEl.value.trim();
+      settings.adapter = currentAdapter();
     }
     settings.temp = +tempEl.value;
     settings.max = +maxEl.value;
@@ -602,7 +643,12 @@
     rememberWrap.hidden = !cfg.needsKey;
     urlField.hidden = p !== 'local';
     adapterField.hidden = p !== 'local';
-    adapterEl.value = settings.adapter || '';
+    buildAdapterMenu();
+    surpriseBtn.disabled = p !== 'local';
+    surpriseBtn.title = p === 'local'
+      ? 'Color each token of the selected text, or the whole document, by how unlikely the model found it'
+      : 'Works with the server on this Mac';
+    surpriseNote.hidden = p !== 'local';
     keyLabel.textContent = cfg.name + ' API key';
     keyLink.href = cfg.keyLink || '#';
     keyEl.placeholder = p === 'openrouter' ? 'sk-or-…' : 'Paste your key';
@@ -636,6 +682,97 @@
     if (!modelEl.hidden) modelEl.focus();
     saveSettings();
   });
+  // ---------- trained add-ons ----------
+  // Two sources: adapters/index.js, which list_adapters.sh writes into the lab
+  // folder (pick_checkpoint.sh and train.sh run it), and add-ons that worked
+  // here before. Loading a script still works from a file:// page, where
+  // fetching a file doesn't.
+  let foundAdapters = [];
+  let foundKey = '';
+  function loadAdapterList() {
+    const old = document.getElementById('adapterList');
+    if (old) old.remove();
+    const el = document.createElement('script');
+    el.id = 'adapterList';
+    el.src = 'adapters/index.js?t=' + Date.now();
+    el.onload = () => {
+      const list = Array.isArray(window.BMP_ADAPTERS) ? window.BMP_ADAPTERS : [];
+      const clean = list.filter((a) => a && typeof a.path === 'string' && a.path.startsWith('/'))
+        .sort((x, y) => String(x.name).localeCompare(String(y.name), undefined, { numeric: true }));
+      const key = JSON.stringify(clean);
+      if (key === foundKey) return;
+      foundKey = key;
+      foundAdapters = clean;
+      if (providerEl.value === 'local' && document.activeElement !== adapterEl) buildAdapterMenu();
+    };
+    el.onerror = () => {};
+    document.head.appendChild(el);
+  }
+  function recentAdapters() {
+    const r = store.get('adapters.recent', []);
+    return Array.isArray(r) ? r.filter((x) => typeof x === 'string' && x.startsWith('/')) : [];
+  }
+  function rememberAdapter(path) {
+    if (!path || !path.startsWith('/')) return;
+    store.set('adapters.recent', [path, ...recentAdapters().filter((x) => x !== path)].slice(0, 8));
+  }
+  const baseName = (path) => path.replace(/\/+$/, '').split('/').pop() || path;
+  function buildAdapterMenu() {
+    const saved = currentAdapterSetting();
+    adapterSelect.textContent = '';
+    const add = (parent, value, text, title) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = text;
+      if (title) opt.title = title;
+      parent.appendChild(opt);
+    };
+    add(adapterSelect, '', 'None (just the model)');
+    const foundPaths = new Set(foundAdapters.map((a) => a.path));
+    if (foundAdapters.length) {
+      const g = document.createElement('optgroup');
+      g.label = 'In the lab’s adapters folder';
+      for (const a of foundAdapters) add(g, a.path, a.name || baseName(a.path), a.path);
+      adapterSelect.appendChild(g);
+    }
+    const others = recentAdapters().filter((x) => !foundPaths.has(x));
+    if (others.length) {
+      const g = document.createElement('optgroup');
+      g.label = 'Used before';
+      for (const path of others) add(g, path, baseName(path), path);
+      adapterSelect.appendChild(g);
+    }
+    add(adapterSelect, OTHER_ADAPTER, 'Other folder…');
+    const known = saved === '' || [...adapterSelect.options].some((o) => o.value === saved && o.value !== OTHER_ADAPTER);
+    if (known) {
+      adapterSelect.value = saved;
+      adapterEl.value = '';
+    } else {
+      adapterSelect.value = OTHER_ADAPTER;
+      adapterEl.value = saved;
+    }
+    adapterEl.hidden = adapterSelect.value !== OTHER_ADAPTER;
+    adapterSelect.title = adapterSelect.value && adapterSelect.value !== OTHER_ADAPTER ? adapterSelect.value : '';
+  }
+  // While the menu is on screen, what it shows is the setting; before it's built, the stored one is.
+  function currentAdapterSetting() {
+    return adapterSelect.options.length ? currentAdapter() : (settings.adapter || '');
+  }
+  adapterSelect.addEventListener('change', () => {
+    adapterEl.hidden = adapterSelect.value !== OTHER_ADAPTER;
+    if (!adapterEl.hidden) adapterEl.focus();
+    adapterSelect.title = adapterSelect.value && adapterSelect.value !== OTHER_ADAPTER ? adapterSelect.value : '';
+    // Picking an add-on from the lab folder also picks the model it was trained on.
+    const a = foundAdapters.find((x) => x.path === adapterSelect.value);
+    if (a && a.model && [...modelSelect.options].some((o) => o.value === a.model)) {
+      modelSelect.value = a.model;
+      modelEl.hidden = true;
+    }
+    saveSettings();
+  });
+  // New add-ons show up when you come back to this tab, say after running pick_checkpoint.sh.
+  window.addEventListener('focus', loadAdapterList);
+
   providerEl.addEventListener('change', () => { applyProvider(); saveSettings(); });
   [modelEl, maxEl, nEl, stopEl, baseUrlEl, adapterEl].forEach((el) => {
     el.addEventListener('input', saveSettings);
@@ -657,6 +794,17 @@
     constructor(status, message) { super(message || ''); this.status = status; }
   }
 
+  // OpenAI-style servers send {"error": {"message": ...}}; mlx_lm.server sends {"error": "..."}.
+  function errorText(j) {
+    if (!j || !j.error) return '';
+    if (typeof j.error === 'string') return j.error;
+    return j.error.message || '';
+  }
+  function errorCode(j) {
+    return (j && j.error && typeof j.error === 'object' && j.error.code) || 0;
+  }
+  const sentence = (s) => (/[.!?]$/.test(s) ? s : s + '.');
+
   function describeError(e, o) {
     const who = o.cfg.name;
     const Who = who.charAt(0).toUpperCase() + who.slice(1);
@@ -672,7 +820,8 @@
         return Who + ' refused access to ' + (o.model || 'this model') + '.' + gated + said;
       }
       if (e.status === 429) return Who + ' is limiting how many requests you can make. Set Samples to 1, or wait a moment and try again.' + said;
-      if (e.status === 404 || /model/i.test(m)) return Who + ' returned: ' + (m || 'model not found') + ' Check the model name (' + (o.model || 'blank') + ').';
+      if (o.adapter && /adapter/i.test(m)) return "Couldn't load the trained add-on in " + o.adapter + '. Check that the folder exists and has adapters.safetensors and adapter_config.json in it.' + said;
+      if (e.status === 404 || /model/i.test(m)) return Who + ' returned: ' + sentence(m || 'model not found') + ' Check the model name (' + (o.model || 'blank') + ')' + (o.adapter ? ' and the add-on folder' : '') + '.';
       return Who + ' returned an error' + (e.status ? ' (' + e.status + ')' : '') + (m ? ': ' + m : '.');
     }
     if (e instanceof TypeError) {
@@ -724,14 +873,14 @@
       if (signal.aborted) { finishCard(card, 'stopped'); return; }
       if (!res.ok) {
         let msg = '';
-        try { const j = await res.json(); msg = (j && j.error && j.error.message) || ''; } catch (e) {}
+        try { msg = errorText(await res.json()); } catch (e) {}
         throw new ApiError(res.status, msg);
       }
       const ct = res.headers.get('content-type') || '';
       if (!ct.includes('text/event-stream') || !res.body) {
         const j = await res.json();
         if (signal.aborted) { finishCard(card, 'stopped'); return; }
-        if (j.error) throw new ApiError(j.error.code || 0, j.error.message);
+        if (j.error) throw new ApiError(errorCode(j), errorText(j));
         const ch = j.choices && j.choices[0];
         addText(card, pickText(ch));
         card.finish = ch && ch.finish_reason;
@@ -755,7 +904,7 @@
           if (data === '[DONE]') continue;
           let j;
           try { j = JSON.parse(data); } catch (e) { continue; }
-          if (j.error) throw new ApiError(j.error.code || 0, j.error.message);
+          if (j.error) throw new ApiError(errorCode(j), errorText(j));
           const ch = j.choices && j.choices[0];
           if (!ch) continue;
           const t = pickText(ch);
@@ -866,6 +1015,17 @@
   function setRunning(on) {
     goBtn.disabled = on;
     stopBtn.disabled = !on;
+    surpriseBtn.disabled = on || providerEl.value !== 'local';
+  }
+
+  function showPanel(kind) {
+    if (kind === 'surprise') {
+      panelTitle.textContent = 'Surprise';
+      samplesSub.textContent = 'How unlikely the model found each token, given everything before it. Point at a token to see what it expected instead; click to keep it selected.';
+    } else {
+      panelTitle.textContent = 'Continuations';
+      samplesSub.textContent = 'Each sample is a separate run of the same document.';
+    }
   }
 
   async function go() {
@@ -882,7 +1042,7 @@
       focusModel();
       return;
     }
-    const adapter = provider === 'local' ? adapterEl.value.trim() : '';
+    const adapter = provider === 'local' ? currentAdapter() : '';
     if (adapter && !model) {
       keyMsg.textContent = 'Pick the model this add-on was trained on.';
       focusModel();
@@ -890,7 +1050,7 @@
     }
     if (adapter && !adapter.startsWith('/')) {
       keyMsg.textContent = 'Use the add-on folder’s full path, starting with /Users/.';
-      adapterEl.focus();
+      (adapterSelect.value === OTHER_ADAPTER ? adapterEl : adapterSelect).focus();
       return;
     }
     const prompt = ta.value;
@@ -913,6 +1073,8 @@
     const ctl = new AbortController();
     controller = ctl;
     batch = { prompt, stops: o.stops, cards: [] };
+    const thisBatch = batch;
+    showPanel('continuations');
     samplesBox.textContent = '';
     emptyEl.hidden = true;
     setRunning(true);
@@ -930,10 +1092,195 @@
     const workers = [];
     for (let i = 0; i < Math.min(cfg.parallel, n); i++) workers.push(worker());
     await Promise.allSettled(workers);
+    if (adapter && thisBatch.cards.some((c) => c.state === 'done')) {
+      rememberAdapter(adapter);
+      if (document.activeElement !== adapterEl) buildAdapterMenu();
+    }
     if (controller === ctl) setRunning(false);
     refreshAppendState();
   }
 
+  // ---------- surprise view ----------
+  // The lab's server answers a completion request that carries "lab_score"
+  // with the probability the model gave each token of that text (see
+  // server_launcher.py). Training's loss is the average of -log(probability)
+  // over a reply's tokens, so this shows what training is scoring.
+  const BUCKETS = [[0.5, 'b0'], [0.2, 'b1'], [0.05, 'b2'], [0.01, 'b3'], [0, 'b4']];
+  const bucket = (p) => BUCKETS.find(([min]) => p >= min)[1];
+  const pct = (p) => (p >= 0.995 ? '99+%' : p >= 0.1 ? Math.round(p * 100) + '%' : p >= 0.001 ? (p * 100).toFixed(1) + '%' : '<0.1%');
+  const ordinal = (n) => n + (n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th'));
+  const END_TOKENS = new Set(['<|end_of_text|>', '</s>', '<|endoftext|>', '<|eot_id|>']);
+  function tokChip(text) {
+    const el = document.createElement('span');
+    el.className = 'tok';
+    el.textContent = END_TOKENS.has(text) ? '⟨end⟩' : text.replace(/\n/g, '↵');
+    return el;
+  }
+
+  function surpriseLegend() {
+    const el = document.createElement('p');
+    el.className = 's-legend';
+    el.append('Chance the model gave each token:');
+    for (const [cls, label] of [['b0', '50% or more'], ['b1', '20–50%'], ['b2', '5–20%'], ['b3', '1–5%'], ['b4', 'under 1%']]) {
+      const s = document.createElement('span'); s.className = cls;
+      const i = document.createElement('i'); s.append(i, label);
+      el.appendChild(s);
+    }
+    return el;
+  }
+
+  const surpriseCards = [];
+  let pinned = null;
+  function highlight(i) {
+    for (const c of surpriseCards) {
+      c.text.querySelectorAll('.hl').forEach((x) => x.classList.remove('hl'));
+      if (i == null || !c.data) { if (c.data) c.showHint(); continue; }
+      const t = c.text.querySelector('[data-i="' + i + '"]');
+      if (t) t.classList.add('hl');
+      c.showDetail(i);
+    }
+  }
+
+  function makeSurpriseCard(label, prompt) {
+    const el = document.createElement('article');
+    el.className = 'sample surprise';
+    const head = document.createElement('div'); head.className = 's-head';
+    const name = document.createElement('strong'); name.textContent = label;
+    const status = document.createElement('span'); status.className = 'status'; status.textContent = 'Waiting for its turn…';
+    head.append(name, status);
+    const sum = document.createElement('p'); sum.className = 's-sum';
+    const text = document.createElement('p'); text.className = 'sample-text s-text';
+    if (prompt) { const ctx = document.createElement('span'); ctx.className = 'ctx'; ctx.textContent = tail(prompt, 90); text.appendChild(ctx); }
+    const detail = document.createElement('p'); detail.className = 's-detail';
+    el.append(head, sum, text, detail);
+    samplesBox.appendChild(el);
+    const card = { el, status, sum, text, detail, data: null };
+    card.showHint = () => {
+      detail.textContent = '';
+      const h = document.createElement('span'); h.className = 'hint';
+      h.textContent = 'Point at a token to see the model’s top guesses for that spot.';
+      detail.appendChild(h);
+    };
+    card.showDetail = (i) => {
+      const d = card.data;
+      detail.textContent = '';
+      if (i === 'end') {
+        detail.append('Chance the document ends right here: ' + pct(Math.exp(d.end.logprob)) + '. Its top guesses for what comes next: ');
+        d.end.top.forEach((a, k) => { if (k) detail.append(' · '); detail.append(tokChip(a.text), ' ' + pct(Math.exp(a.logprob))); });
+        return;
+      }
+      const t = d.tokens[i];
+      if (!t) return;
+      detail.append(tokChip(t.text), ' got ' + pct(Math.exp(t.logprob)) + (t.rank === 1 ? ', the model’s top guess.' : ', the model’s ' + ordinal(t.rank) + ' choice.') + ' Top guesses: ');
+      t.top.forEach((a, k) => { if (k) detail.append(' · '); detail.append(tokChip(a.text), ' ' + pct(Math.exp(a.logprob))); });
+    };
+    surpriseCards.push(card);
+    return card;
+  }
+
+  function fillSurpriseCard(card, d) {
+    card.data = d;
+    const n = d.tokens.length;
+    const loss = d.tokens.reduce((a, t) => a - t.logprob, 0) / n;
+    const pEnd = Math.exp(d.end.logprob);
+    card.status.textContent = n + (n === 1 ? ' token' : ' tokens');
+    card.sum.textContent = 'Average loss ' + loss.toFixed(2) + ', so a typical token got about a 1-in-' +
+      Math.max(1, Math.round(Math.exp(loss))) + ' chance. Chance the document ends right after this: ' + pct(pEnd) + '.';
+    d.tokens.forEach((t, i) => {
+      const el = document.createElement('span');
+      el.className = 't ' + bucket(Math.exp(t.logprob)) + (t.text.includes('\n') ? ' nl' : '');
+      el.dataset.i = String(i);
+      el.textContent = t.text;
+      card.text.appendChild(el);
+    });
+    const end = document.createElement('span');
+    end.className = 't end ' + bucket(pEnd);
+    end.dataset.i = 'end';
+    end.textContent = 'end ' + pct(pEnd);
+    end.title = 'Chance the document ends right here';
+    card.text.appendChild(end);
+    card.text.addEventListener('mouseover', (e) => {
+      const t = e.target.closest('.t');
+      if (t && pinned == null) highlight(t.dataset.i);
+    });
+    card.text.addEventListener('mouseleave', () => { if (pinned == null) highlight(null); });
+    card.text.addEventListener('click', (e) => {
+      const t = e.target.closest('.t');
+      if (!t) return;
+      pinned = pinned === t.dataset.i ? null : t.dataset.i;
+      highlight(pinned != null ? pinned : t.dataset.i);
+    });
+    card.showHint();
+  }
+
+  async function scoreOne(o, adapter) {
+    const body = { prompt: o.prompt, lab_score: o.text, max_tokens: 1 };
+    if (o.model) body.model = o.model;
+    if (adapter) body.adapters = adapter;
+    const res = await fetch(o.base + '/completions', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    let j = null;
+    try { j = await res.json(); } catch (e) {}
+    if (!res.ok) throw new ApiError(res.status, errorText(j));
+    if (!j || !j.lab_score) throw new Error('needs-new-server');
+    return j.lab_score;
+  }
+
+  async function runSurprise() {
+    if (providerEl.value !== 'local') return;
+    const cfg = prov();
+    const model = currentModel();
+    const adapter = currentAdapter();
+    if (adapter && !model) { keyMsg.textContent = 'Pick the model this add-on was trained on.'; focusModel(); return; }
+    if (adapter && !adapter.startsWith('/')) { keyMsg.textContent = 'Use the add-on folder’s full path, starting with /Users/.'; return; }
+    const a = ta.selectionStart, b = ta.selectionEnd;
+    const o = {
+      cfg, provider: 'local', model, adapter,
+      base: (baseUrlEl.value.trim() || cfg.defaultBase).replace(/\/+$/, ''),
+      prompt: b > a ? ta.value.slice(0, a) : '',
+      text: b > a ? ta.value.slice(a, b) : ta.value,
+    };
+    if (!o.text) { ta.focus(); return; }
+    keyMsg.textContent = '';
+    saveSettings();
+    if (controller) controller.abort();
+    const ctl = new AbortController();
+    controller = ctl;
+    batch = null;
+    samplesBox.textContent = '';
+    surpriseCards.length = 0;
+    pinned = null;
+    emptyEl.hidden = true;
+    showPanel('surprise');
+    setRunning(true);
+    samplesBox.appendChild(surpriseLegend());
+    const modelName = (modelSelect.selectedOptions[0] && modelSelect.value !== CUSTOM ? modelSelect.selectedOptions[0].textContent : model) || 'The server’s model';
+    const runs = adapter
+      ? [[adapter, modelName + ' + ' + baseName(adapter)], ['', modelName + ', no add-on']]
+      : [['', modelName]];
+    const cards = runs.map(([, label]) => makeSurpriseCard(label, o.prompt));
+    for (let k = 0; k < runs.length; k++) {
+      if (ctl.signal.aborted) { cards[k].status.textContent = 'Stopped'; continue; }
+      cards[k].status.textContent = 'Scoring… a few seconds more if the model or add-on just changed';
+      try {
+        const d = await scoreOne(o, runs[k][0]);
+        if (ctl.signal.aborted) { cards[k].status.textContent = 'Stopped'; continue; }
+        fillSurpriseCard(cards[k], d);
+      } catch (e) {
+        cards[k].el.classList.add('error');
+        cards[k].status.textContent = 'Failed';
+        const msg = e && e.message === 'needs-new-server'
+          ? 'This server doesn’t know how to score text yet. Stop it with Control-C and start it again with bash ~/Documents/base-model-lab/start-base-model.sh.'
+          : describeError(e, { cfg, provider: 'local', model, adapter: runs[k][0], base: o.base });
+        const err = document.createElement('span'); err.className = 'err'; err.textContent = msg;
+        cards[k].text.appendChild(err);
+      }
+    }
+    if (controller === ctl) setRunning(false);
+  }
+
+  surpriseBtn.addEventListener('click', runSurprise);
   goBtn.addEventListener('click', go);
   stopBtn.addEventListener('click', () => { if (controller) controller.abort(); });
   document.addEventListener('keydown', (e) => {
@@ -967,6 +1314,7 @@
   rememberEl.checked = !!store.get('remember', false);
   providerEl.value = settings.provider;
   applyProvider();
+  loadAdapterList();
 
   const saved = store.get('doc', null);
   if (saved && typeof saved.text === 'string') {

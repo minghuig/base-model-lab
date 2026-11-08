@@ -3,8 +3,8 @@
 
 model: mlx-community/Meta-Llama-3.1-8B-4bit
 train: true
-data: data                  # folder with train.jsonl (282 examples) and valid.jsonl (30)
-adapter_path: adapters/prose
+data: data                  # folder with train.jsonl (370 conversations) and valid.jsonl (42)
+adapter_path: adapters/prose-v2   # run 1 was adapters/prose; give each run its own folder
 
 fine_tune_type: lora
 mask_prompt: true           # only the assistant's reply counts toward the loss
@@ -15,13 +15,13 @@ lora_parameters:
   dropout: 0.0
 
 batch_size: 2               # examples per weight update
-iters: 150                  # weight updates; about 1 pass over the training set (run 1 overfit past 100)
+iters: 300                  # weight updates; one pass over the training set is 185
 learning_rate: 2e-5         # size of each nudge
 
 steps_per_report: 10        # print the training loss every 10 updates
-steps_per_eval: 50          # score the 30 held-out examples every 50 updates
+steps_per_eval: 25          # score the 42 held-out conversations every 25 updates
 val_batches: -1             # use all of them
-save_every: 50              # save a snapshot of the add-on every 50 updates
+save_every: 25              # save a snapshot of the add-on every 25 updates
 
 max_seq_length: 1024
 grad_checkpoint: true       # recompute some values instead of storing them, to save memory

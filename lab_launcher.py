@@ -1,17 +1,26 @@
 """Runs mlx-lm's LoRA trainer with the lab's chat format.
 
-Each training example is a prompt/completion pair. mlx-lm turns a pair into
-text with the tokenizer's chat template, and Llama 3.1 base has none, so this
-supplies one:
+Each training example is a conversation (a list of messages). mlx-lm turns it
+into text with the tokenizer's chat template, and Llama 3.1 base has none, so
+this supplies one:
 
-    <|begin_of_text|>User: {prompt}
+    <|begin_of_text|>User: {first message}
 
-    Assistant: {completion}<|end_of_text|>
+    Assistant: {first reply}
 
-The start and end tokens are the base model's own start- and end-of-document
-tokens, which it learned in pre-training, so "end of document" becomes "end of
-my reply". With mask_prompt on, only " {completion}<|end_of_text|>" counts
-toward the loss: the model is graded on answering, not on imitating users.
+    User: {second message}
+
+    Assistant: {last reply}<|end_of_text|>
+
+A single exchange is just the first and last lines. The start and end tokens
+are the base model's own start- and end-of-document tokens, which it learned in
+pre-training, so "end of document" becomes "end of my reply". Only the last
+reply gets one: that's where the server should stop, even when the earlier
+turns make the conversation look like it's still going.
+
+With mask_prompt on, only " {last reply}<|end_of_text|>" counts toward the
+loss. Earlier turns are context, the way a chat app sends the whole
+conversation each time and the model writes one reply.
 
 It also applies the same tokenizer fix as the playground server: some model
 conversions end every prompt with an end-of-document token or leave off the
@@ -48,11 +57,12 @@ def fix_special_tokens(tokenizer):
 def make_chat_template(bos, eos):
     def render(messages, add_generation_prompt=False, **kwargs):
         text = bos
-        for message in messages:
+        for i, message in enumerate(messages):
             if message["role"] == "user":
                 text += "User: " + message["content"] + "\n\nAssistant:"
             elif message["role"] == "assistant":
-                text += " " + message["content"] + eos
+                last = i == len(messages) - 1
+                text += " " + message["content"] + (eos if last else "\n\n")
             else:
                 raise ValueError(f"Unexpected role in training data: {message['role']}")
         return text

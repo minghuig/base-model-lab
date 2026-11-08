@@ -11,11 +11,26 @@ patches, and results so far.
 - Only one model fits in memory. Training needs the server stopped, and the
   server swaps models rather than holding two.
 - data/*.jsonl is generated. Edit dataset_src/b*.py, then run
-  python3 dataset_src/build_dataset.py and read its quality report.
+  python3 dataset_src/build_dataset.py and read its quality report. Items are
+  (user, reply) pairs or lists of alternating turns; only the last reply is
+  trained. Add new batches with a higher number so earlier held-out
+  conversations stay put.
+- Give each training run its own adapter_path in config.yaml (adapters/prose,
+  adapters/prose-v2, ...). pick_checkpoint.sh and list_adapters.sh keep the
+  playground's add-on menu in sync.
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.
-- The launchers patch mlx-lm internals. If mlx-lm is upgraded, check that the
-  server still prints its tokenizer message, then try one continuation.
+- The launchers (server_launcher.py, lab_launcher.py) patch mlx-lm internals,
+  written against mlx-lm 0.32.2. If mlx-lm is upgraded, check that the server
+  still prints its tokenizer message, then try one continuation and one
+  Show surprise.
+- You can test server and training changes without the Mac: MLX runs on Linux
+  CPU (pip install "mlx[cpu]" mlx-lm==0.32.2). Make a tiny randomly
+  initialized llama model (mlx_lm.models.llama) with a small byte-level BPE
+  tokenizer trained on data/ and saved with transformers, then run
+  server_launcher.py or lab_launcher.py against it. That's how the scoring
+  patch and the multi-turn masking were checked.
 - After a training run worth keeping, save a cleaned copy of train-log.txt in
   runs/ (strip the color codes and progress bars), and add its results to the
-  README.
+  README, including what samples in the playground showed. Held-out loss
+  alone has misled us before.
