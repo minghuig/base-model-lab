@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Base model playground</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spline+Sans:wght@400;500;600&family=Spline+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #E9ECE6;
+    --sheet: #FAFBF8;
+    --panel: #F2F4EF;
+    --graphite: #23262B;
+    --muted: #62675F;
+    --rule: #CBD0C6;
+    --ink: #2B37CF;
+    --on-ink: #FFFFFF;
+    --select: rgba(43, 55, 207, .20);
+    --danger: #A8261C;
+    --mono: "Spline Sans Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: "Spline Sans", system-ui, -apple-system, sans-serif;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #15171A;
+      --sheet: #1D2024;
+      --panel: #191B1F;
+      --graphite: #E3E5E0;
+      --muted: #979C93;
+      --rule: #30343A;
+      --ink: #9EA8FF;
+      --on-ink: #10132A;
+      --select: rgba(158, 168, 255, .25);
+      --danger: #FF8E84;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--paper);
+    color: var(--graphite);
+    font: 15px/1.5 var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .app { height: 100vh; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+
+  /* Header */
+  header {
+    display: flex; flex-wrap: wrap; align-items: flex-end;
+    gap: 14px 28px; padding: 18px 28px 16px;
+    border-bottom: 1px solid var(--rule);
+  }
+  .brand h1 { margin: 0; font: 600 19px/1.2 var(--sans); letter-spacing: -.01em; }
+  .brand p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+  .creds { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; margin-left: auto; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .lbl { font-size: 12.5px; font-weight: 500; color: var(--muted); }
+  .lbl a { color: var(--muted); }
+  input[type=text], input[type=password], input[type=number], select {
+    font: 14px var(--mono); color: var(--graphite);
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 5px;
+    padding: 7px 9px; min-width: 0;
+  }
+  input:focus-visible, select:focus-visible { outline-offset: 0; }
+  #key { width: min(290px, 80vw); }
+  .model-wrap { display: flex; gap: 6px; flex-wrap: wrap; }
+  #modelSelect { max-width: min(320px, 80vw); }
+  #model { width: min(250px, 80vw); }
+  #model[hidden] { display: none; }
+  .check { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); padding-bottom: 8px; cursor: pointer; }
+  .check input { accent-color: var(--ink); margin: 0; }
+  .key-msg { flex-basis: 100%; text-align: right; margin: -4px 0 0; font-size: 13px; color: var(--danger); }
+  .key-msg:empty { display: none; }
+  .frame-note {
+    flex-basis: 100%; margin: 0; padding: 10px 14px;
+    border-left: 3px solid var(--danger); background: var(--sheet);
+    font-size: 14px; color: var(--graphite);
+  }
+  .frame-note[hidden], .field[hidden], .check[hidden] { display: none; }
+  #provider { min-width: 150px; }
+  #baseUrl { width: min(230px, 80vw); }
+  #adapter { width: min(260px, 80vw); }
+  .provider-note { flex-basis: 100%; margin: -2px 0 0; font-size: 13px; color: var(--muted); max-width: 110ch; }
+  .provider-note:empty { display: none; }
+  .provider-note code { font: 12.5px var(--mono); color: var(--graphite); }
+  .provider-note a { color: var(--muted); }
+
+  /* Layout */
+  main { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); min-height: 0; }
+  .doc-col {
+    display: flex; flex-direction: column; gap: 12px;
+    padding: 16px 28px 20px; border-right: 1px solid var(--rule);
+    min-height: 0; overflow: auto;
+  }
+  .samples-col { padding: 16px 28px 28px; background: var(--panel); overflow: auto; min-height: 0; }
+
+  /* Starters + legend */
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+  .row .lbl { margin-right: 2px; }
+  .chip {
+    font: 13px var(--sans); color: var(--graphite);
+    background: transparent; border: 1px solid var(--rule); border-radius: 4px;
+    padding: 4px 9px; cursor: pointer;
+  }
+  .chip:hover { border-color: var(--muted); }
+  .legend { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+  .legend .you i { background: var(--graphite); }
+  .legend .it i { background: var(--ink); }
+  .legend .spacer, .legend #restore[hidden] + #clear { margin-left: auto; }
+
+  /* Editor: a transparent textarea over a mirror that colors model-written text */
+  .editor {
+    position: relative; flex: 1 1 auto; min-height: 300px;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 6px;
+    overflow: hidden;
+  }
+  .editor:focus-within { border-color: var(--ink); }
+  .tx {
+    font: 16px/1.65 var(--mono);
+    letter-spacing: 0; font-variant-ligatures: none; font-kerning: normal;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; tab-size: 4;
+    padding: 18px 20px;
+  }
+  #doc {
+    position: absolute; inset: 0; width: 100%; height: 100%; margin: 0;
+    resize: none; border: 0; outline: none; background: transparent;
+    color: transparent; caret-color: var(--graphite);
+    overflow-y: auto; z-index: 1;
+  }
+  #doc::selection { background: var(--select); color: transparent; }
+  #doc::placeholder { color: var(--muted); }
+  #mirror { position: absolute; top: 0; left: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  #mirror-inner { width: 100%; color: var(--graphite); }
+  #mirror .m { color: var(--ink); }
+  #mirror .ws { color: var(--muted); }
+
+  /* Controls */
+  .controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 18px; }
+  .actions { display: flex; gap: 8px; }
+  button {
+    font: 500 14px var(--sans); color: var(--graphite);
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 5px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+  button.primary:hover:not(:disabled) { border-color: var(--ink); filter: brightness(1.08); }
+  button.small { font-size: 13px; padding: 5px 10px; }
+  button.quiet { border: 0; background: none; padding: 4px 2px; color: var(--muted); text-decoration: underline; text-underline-offset: 3px; }
+  .kbd { opacity: .7; font-weight: 400; margin-left: 6px; }
+  #temp { width: 130px; accent-color: var(--ink); margin: 0; height: 33px; }
+  .temp-wrap { display: flex; align-items: center; gap: 8px; }
+  #tempOut { font: 14px var(--mono); min-width: 2.6em; }
+  #max { width: 82px; }
+  #stops { width: 150px; }
+
+  .note { margin: 0; font-size: 13px; color: var(--muted); max-width: 70ch; }
+  .note code { font: 12.5px var(--mono); }
+  #wsHint { color: var(--graphite); }
+
+  /* Continuations */
+  .samples-col h2 { margin: 0 0 4px; font: 600 15px/1.3 var(--sans); }
+  .samples-col .sub { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+  .empty { color: var(--muted); font-size: 14px; max-width: 46ch; margin-top: 24px; }
+  .sample { border-left: 3px solid var(--ink); padding: 2px 0 2px 16px; margin: 0 0 26px; }
+  .sample-text { font: 15px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: break-word; margin: 0; }
+  .sample .ctx { color: var(--muted); }
+  .sample .gen { color: var(--ink); }
+  .sample .err { display: block; margin-top: 6px; font: 14px/1.5 var(--sans); color: var(--danger); white-space: normal; }
+  .sample.stale { opacity: .5; }
+  .sample.appended { border-left-color: var(--graphite); }
+  .caret {
+    display: inline-block; width: .55em; height: 1.05em; vertical-align: -.17em;
+    background: var(--ink); margin-left: 1px;
+    animation: blink 1s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  .sample-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+  .status { font-size: 12.5px; color: var(--muted); margin-right: auto; }
+
+  @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+
+  @media (max-width: 860px) {
+    .app { height: auto; min-height: 100vh; }
+    header { padding: 16px 18px 14px; }
+    .creds { margin-left: 0; }
+    .key-msg { text-align: left; }
+    main { grid-template-columns: 1fr; }
+    .doc-col { border-right: 0; border-bottom: 1px solid var(--rule); padding: 14px 18px 18px; overflow: visible; }
+    .editor { min-height: 52vh; }
+    .samples-col { padding: 16px 18px 28px; overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <h1>Base model playground</h1>
+      <p>Write the beginning of a document. The model continues it.</p>
+    </div>
+    <div class="creds">
+      <div class="field">
+        <label class="lbl" for="provider">Provider</label>
+        <select id="provider">
+          <option value="featherless">Featherless</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="local">Server on this Mac</option>
+        </select>
+      </div>
+      <div class="field" id="keyField">
+        <label class="lbl" for="key"><span id="keyLabel">API key</span> · <a id="keyLink" href="https://featherless.ai" target="_blank" rel="noopener">get one</a></label>
+        <input id="key" type="password" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="field" id="urlField" hidden>
+        <label class="lbl" for="baseUrl">Server address</label>
+        <input id="baseUrl" type="text" spellcheck="false">
+      </div>
+      <label class="check" id="rememberWrap"><input id="remember" type="checkbox"> Remember on this computer</label>
+      <div class="field">
+        <label class="lbl" for="modelSelect">Model</label>
+        <div class="model-wrap">
+          <select id="modelSelect"></select>
+          <input id="model" type="text" spellcheck="false" placeholder="Model ID" aria-label="Model ID" hidden>
+        </div>
+      </div>
+      <div class="field" id="adapterField" hidden>
+        <label class="lbl" for="adapter">Trained add-on (optional)</label>
+        <input id="adapter" type="text" spellcheck="false" placeholder="Full folder path">
+      </div>
+      <p class="key-msg" id="keyMsg" role="alert"></p>
+    </div>
+    <p class="provider-note" id="providerNote"></p>
+    <p class="frame-note" id="frameNote" role="alert" hidden></p>
+  </header>
+
+  <main>
+    <section class="doc-col" aria-label="Document">
+      <div class="row" id="starters"><span class="lbl">Start from</span></div>
+
+      <div class="legend">
+        <span class="you"><i></i>Your text</span>
+        <span class="it"><i></i>Model text</span>
+        <button class="quiet spacer" id="restore" type="button" hidden>Restore previous document</button>
+        <button class="quiet" id="clear" type="button">Clear document</button>
+      </div>
+
+      <div class="editor">
+        <div id="mirror" aria-hidden="true"><div id="mirror-inner" class="tx"></div></div>
+        <textarea id="doc" class="tx" spellcheck="false" aria-label="Document text" placeholder="Type the start of any document: a forum post, an encyclopedia entry, a transcript…"></textarea>
+      </div>
+
+      <p class="note" id="wsHint" hidden>Your document ends with a space. Base models usually expect the next word to bring its own space, so a trailing one can throw off the continuation.</p>
+
+      <div class="controls">
+        <div class="actions">
+          <button class="primary" id="go" type="button">Continue<span class="kbd" id="kbd"></span></button>
+          <button id="stop" type="button" disabled>Stop</button>
+        </div>
+        <div class="field">
+          <label class="lbl" for="temp">Temperature</label>
+          <div class="temp-wrap"><input id="temp" type="range" min="0" max="2" step="0.05"><output id="tempOut" for="temp"></output></div>
+        </div>
+        <div class="field">
+          <label class="lbl" for="max">Max tokens</label>
+          <input id="max" type="number" min="1" max="4000" step="10">
+        </div>
+        <div class="field">
+          <label class="lbl" for="n">Samples</label>
+          <select id="n"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>
+        </div>
+        <div class="field">
+          <label class="lbl" for="stops">Stop at</label>
+          <input id="stops" type="text" spellcheck="false" placeholder="e.g. User:">
+        </div>
+      </div>
+      <p class="note">“Stop at” takes up to four strings, separated by commas; write a newline as <code>\n</code>. Your key goes straight from this page to the provider you picked and nowhere else.</p>
+    </section>
+
+    <section class="samples-col" aria-label="Continuations" aria-live="polite">
+      <h2>Continuations</h2>
+      <p class="sub" id="samplesSub">Each sample is a separate run of the same document.</p>
+      <p class="empty" id="empty">Nothing here yet. Write the start of a document, or pick a starter, then press Continue.</p>
+      <div id="samples"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  let inFrame = false;
+  try { inFrame = window.self !== window.top; } catch (e) { inFrame = true; }
+  const FRAME_MSG = "This page is open inside a preview, which can't send requests to model providers. Download the file and open it in Chrome or Safari instead.";
+
+  // parallel: how many samples to request at once. Featherless counts concurrent
+  // requests against your plan (70B models count extra), so it gets one at a time.
+  const PROVIDERS = {
+    featherless: {
+      name: 'Featherless',
+      base: 'https://api.featherless.ai/v1',
+      keyLink: 'https://featherless.ai',
+      needsKey: true,
+      parallel: 1,
+      defaultModel: 'Qwen/Qwen2.5-72B',
+      models: [
+        ['Qwen/Qwen2.5-72B', 'Qwen 2.5 72B base'],
+        ['meta-llama/Meta-Llama-3.1-70B', 'Llama 3.1 70B base (gated)'],
+        ['mistralai/Mistral-Small-3.1-24B-Base-2503', 'Mistral Small 3.1 24B base'],
+        ['mistralai/Mistral-Nemo-Base-2407', 'Mistral Nemo 12B base'],
+        ['Qwen/Qwen3-14B-Base', 'Qwen3 14B base'],
+      ],
+      note: 'Featherless hosts thousands of Hugging Face models, base models included. Llama 3.1 70B is gated there, so it may need a linked Hugging Face account that has accepted Meta’s license; the others work without one. Samples run one at a time to stay within Featherless’s limit on simultaneous requests.',
+    },
+    openrouter: {
+      name: 'OpenRouter',
+      base: 'https://openrouter.ai/api/v1',
+      keyLink: 'https://openrouter.ai/settings/keys',
+      needsKey: true,
+      parallel: 5,
+      defaultModel: '',
+      models: [],
+      note: 'OpenRouter doesn’t host any base models right now. This only helps if you know the ID of one it has added since.',
+    },
+    local: {
+      name: 'the server on this Mac',
+      base: null,
+      defaultBase: 'http://localhost:8080/v1',
+      needsKey: false,
+      parallel: 1,
+      defaultModel: '',
+      models: [
+        ['mlx-community/Mistral-Nemo-Base-2407-4bit', 'Mistral Nemo 12B base'],
+        ['mlx-community/Meta-Llama-3.1-8B-4bit', 'Llama 3.1 8B base (for training)'],
+        ['mlx-community/Qwen2.5-32B-4bit', 'Qwen 2.5 32B base (needs 32 GB of memory)'],
+        ['mlx-community/Meta-Llama-3.1-70B-4bit', 'Llama 3.1 70B base (needs 64 GB of memory)'],
+      ],
+      note: 'For models running on this Mac. Start the server first by running <code>bash ~/Documents/base-model-lab/start-base-model.sh</code> in Terminal, and leave that window open. Pick a model to switch; the first continuation after a switch waits a few seconds while it loads. To use a trained add-on, pick the model it was trained on and paste the add-on folder’s full path.',
+    },
+  };
+
+  const STARTERS = [
+    { name: 'Your question', stop: '',
+      text: "what's a fun activity i can do today" },
+    { name: 'Forum thread', stop: '',
+      text: "r/AskReddit\nPosted by u/quiet_lantern · 6h\n\nWhat's a hobby you picked up as an adult that actually changed your life?\n\n1.2k comments\n\n" },
+    { name: 'Encyclopedia entry', stop: '',
+      text: "Glass-throated marsh owl\n\nFrom Wikipedia, the free encyclopedia\n\nThe glass-throated marsh owl (Asio vitreus) is a species of" },
+    // Stop strings start at the label, not the newline before it: some tokenizers
+    // glue a newline onto the punctuation before it, so "\nUser:" can fail to match.
+    { name: 'Assistant transcript', stop: 'User:',
+      text: "The following is a transcript of a conversation between a curious person and a friendly, knowledgeable AI assistant.\n\nUser: what's a fun activity i can do today?\nAssistant:" },
+    { name: 'Who are you?', stop: 'Q:',
+      text: "Q: Who are you?\nA:" },
+  ];
+
+  const $ = (s) => document.querySelector(s);
+  const ta = $('#doc'), mirror = $('#mirror'), inner = $('#mirror-inner');
+  const keyEl = $('#key'), rememberEl = $('#remember'), modelEl = $('#model'), keyMsg = $('#keyMsg');
+  const providerEl = $('#provider'), keyField = $('#keyField'), keyLabel = $('#keyLabel'), keyLink = $('#keyLink');
+  const urlField = $('#urlField'), baseUrlEl = $('#baseUrl'), rememberWrap = $('#rememberWrap');
+  const providerNote = $('#providerNote'), modelSelect = $('#modelSelect');
+  const CUSTOM = '__custom__';
+
+  // The model menu, plus a text box that appears when "Other model ID…" is picked.
+  function currentModel() {
+    return modelSelect.value === CUSTOM ? modelEl.value.trim() : modelSelect.value;
+  }
+  function focusModel() {
+    (modelSelect.value === CUSTOM ? modelEl : modelSelect).focus();
+  }
+  const adapterField = $('#adapterField'), adapterEl = $('#adapter');
+  const tempEl = $('#temp'), tempOut = $('#tempOut'), maxEl = $('#max'), nEl = $('#n'), stopEl = $('#stops');
+  const goBtn = $('#go'), stopBtn = $('#stop'), samplesBox = $('#samples'), emptyEl = $('#empty'), wsHint = $('#wsHint');
+
+  // ---------- storage (best effort) ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('bmp.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('bmp.' + k, JSON.stringify(v)); } catch (e) {} },
+    del(k) { try { localStorage.removeItem('bmp.' + k); } catch (e) {} },
+  };
+  const session = {
+    get(k) { try { return sessionStorage.getItem('bmp.' + k) || ''; } catch (e) { return ''; } },
+    set(k, v) { try { sessionStorage.setItem('bmp.' + k, v); } catch (e) {} },
+  };
+
+  // ---------- document + provenance ----------
+  // ranges: sorted, non-overlapping [start, end) spans of model-written text
+  let ranges = [];
+  let lastText = '';
+  let pendingModel = null;
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  function normalize(rs) {
+    rs = rs.filter((r) => r[1] > r[0]).sort((a, b) => a[0] - b[0]);
+    const out = [];
+    for (const r of rs) {
+      const last = out[out.length - 1];
+      if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+      else out.push([r[0], r[1]]);
+    }
+    return out;
+  }
+
+  // Work out what changed between two versions of the text (common prefix/suffix)
+  // and move the model ranges to match. Anything newly typed counts as yours.
+  function shiftRanges(oldT, newT) {
+    if (oldT === newT) return;
+    const minLen = Math.min(oldT.length, newT.length);
+    let p = 0;
+    while (p < minLen && oldT.charCodeAt(p) === newT.charCodeAt(p)) p++;
+    let s = 0;
+    while (s < minLen - p && oldT.charCodeAt(oldT.length - 1 - s) === newT.charCodeAt(newT.length - 1 - s)) s++;
+    const oldEnd = oldT.length - s;
+    const delta = newT.length - oldT.length;
+    const out = [];
+    for (const [a, b] of ranges) {
+      if (b <= p) { out.push([a, b]); continue; }
+      if (a >= oldEnd) { out.push([a + delta, b + delta]); continue; }
+      if (a < p) out.push([a, p]);
+      if (b > oldEnd) out.push([oldEnd + delta, b + delta]);
+    }
+    ranges = normalize(out);
+  }
+
+  function render() {
+    const t = ta.value;
+    const trail = t.match(/ +$/);
+    const trailStart = trail ? t.length - trail[0].length : t.length;
+    const pieces = [];
+    let pos = 0;
+    for (const [a, b] of ranges) {
+      if (a > pos) pieces.push([pos, a, false]);
+      pieces.push([a, b, true]);
+      pos = b;
+    }
+    if (pos < t.length) pieces.push([pos, t.length, false]);
+    let html = '';
+    for (const [a, b, isModel] of pieces) {
+      let seg;
+      if (b <= trailStart) seg = esc(t.slice(a, b));
+      else if (a >= trailStart) seg = '<span class="ws">' + '·'.repeat(b - a) + '</span>';
+      else seg = esc(t.slice(a, trailStart)) + '<span class="ws">' + '·'.repeat(b - trailStart) + '</span>';
+      html += isModel ? '<span class="m">' + seg + '</span>' : seg;
+    }
+    if (t === '' || t.endsWith('\n')) html += ' ';
+    inner.innerHTML = html;
+    wsHint.hidden = !trail;
+    sizeMirror();
+  }
+
+  function sizeMirror() {
+    mirror.style.width = ta.clientWidth + 'px';
+    mirror.style.height = ta.clientHeight + 'px';
+    mirror.scrollTop = ta.scrollTop;
+  }
+
+  let saveTimer = null;
+  function saveDocSoon() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => store.set('doc', { text: ta.value, ranges }), 300);
+  }
+
+  function onDocInput() {
+    const t = ta.value;
+    shiftRanges(lastText, t);
+    if (pendingModel) {
+      ranges = normalize(ranges.concat([[pendingModel.start, pendingModel.start + pendingModel.len]]));
+      pendingModel = null;
+    }
+    lastText = t;
+    render();
+    saveDocSoon();
+    refreshAppendState();
+  }
+
+  // Starters and Clear replace the whole document; keep one copy so it can come back.
+  let prevDoc = null;
+  const restoreBtn = $('#restore');
+
+  function replaceDoc(text, newRanges) {
+    if (ta.value && ta.value !== text) {
+      prevDoc = { text: ta.value, ranges: ranges.map((r) => r.slice()) };
+      restoreBtn.hidden = false;
+    }
+    setDoc(text, newRanges);
+  }
+
+  restoreBtn.addEventListener('click', () => {
+    if (!prevDoc) return;
+    const p = prevDoc;
+    prevDoc = ta.value ? { text: ta.value, ranges: ranges.map((r) => r.slice()) } : null;
+    restoreBtn.hidden = !prevDoc;
+    setDoc(p.text, p.ranges);
+  });
+
+  function setDoc(text, newRanges) {
+    ta.value = text;
+    lastText = text;
+    ranges = normalize(newRanges || []);
+    render();
+    saveDocSoon();
+    refreshAppendState();
+    ta.focus();
+    ta.setSelectionRange(text.length, text.length);
+    ta.scrollTop = ta.scrollHeight;
+    sizeMirror();
+  }
+
+  function insertModelText(text) {
+    const start = ta.value.length;
+    ta.focus();
+    ta.setSelectionRange(start, start);
+    pendingModel = { start, len: text.length };
+    let ok = false;
+    try { ok = document.execCommand('insertText', false, text); } catch (e) { ok = false; }
+    if (!ok || ta.value.length !== start + text.length) {
+      if (!ok) ta.value = ta.value.slice(0, start) + text;
+    }
+    if (pendingModel) onDocInput(); // input event didn't fire synchronously
+    ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.scrollTop = ta.scrollHeight;
+    sizeMirror();
+  }
+
+  ta.addEventListener('input', onDocInput);
+  ta.addEventListener('scroll', () => { mirror.scrollTop = ta.scrollTop; });
+  if ('ResizeObserver' in window) new ResizeObserver(sizeMirror).observe(ta);
+  window.addEventListener('resize', sizeMirror);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(render);
+
+  $('#clear').addEventListener('click', () => replaceDoc(''));
+
+  // ---------- starters ----------
+  const startersRow = $('#starters');
+  for (const s of STARTERS) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'chip';
+    b.textContent = s.name;
+    b.addEventListener('click', () => {
+      stopEl.value = s.stop;
+      saveSettings();
+      replaceDoc(s.text);
+    });
+    startersRow.appendChild(b);
+  }
+
+  // ---------- settings, provider + key ----------
+  const settings = Object.assign({ provider: 'featherless', models: {}, localUrl: '', adapter: '', temp: 1, max: 200, n: 3, stops: '' }, store.get('settings', {}));
+  if (typeof settings.models !== 'object' || !settings.models) settings.models = {};
+  if (!PROVIDERS[settings.provider]) settings.provider = 'featherless';
+
+  function prov() { return PROVIDERS[providerEl.value] || PROVIDERS.featherless; }
+
+  function saveSettings() {
+    settings.provider = providerEl.value;
+    settings.models[providerEl.value] = currentModel();
+    if (providerEl.value === 'local') {
+      settings.localUrl = baseUrlEl.value.trim();
+      settings.adapter = adapterEl.value.trim();
+    }
+    settings.temp = +tempEl.value;
+    settings.max = +maxEl.value;
+    settings.n = +nEl.value;
+    settings.stops = stopEl.value;
+    store.set('settings', settings);
+  }
+
+  function saveKey() {
+    const p = providerEl.value;
+    const k = keyEl.value.trim();
+    session.set('key.' + p, k);
+    store.set('remember', rememberEl.checked);
+    for (const id of Object.keys(PROVIDERS)) {
+      const v = id === p ? k : (rememberEl.checked ? (session.get('key.' + id) || store.get('key.' + id, '')) : '');
+      if (rememberEl.checked && v) store.set('key.' + id, v); else store.del('key.' + id);
+    }
+    if (k) keyMsg.textContent = '';
+  }
+
+  function loadKey(p) {
+    return session.get('key.' + p) || (rememberEl.checked && store.get('key.' + p, '')) || '';
+  }
+
+  function applyProvider() {
+    const p = providerEl.value, cfg = prov();
+    keyMsg.textContent = '';
+    keyField.hidden = !cfg.needsKey;
+    rememberWrap.hidden = !cfg.needsKey;
+    urlField.hidden = p !== 'local';
+    adapterField.hidden = p !== 'local';
+    adapterEl.value = settings.adapter || '';
+    keyLabel.textContent = cfg.name + ' API key';
+    keyLink.href = cfg.keyLink || '#';
+    keyEl.placeholder = p === 'openrouter' ? 'sk-or-…' : 'Paste your key';
+    keyEl.value = cfg.needsKey ? loadKey(p) : '';
+    baseUrlEl.value = settings.localUrl || PROVIDERS.local.defaultBase;
+    const saved = settings.models[p] != null ? settings.models[p] : cfg.defaultModel;
+    modelSelect.textContent = '';
+    const addOption = (value, text) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = text;
+      modelSelect.appendChild(opt);
+    };
+    if (p === 'local') addOption('', 'Whatever the server started with');
+    for (const [id, label] of cfg.models) addOption(id, label);
+    addOption(CUSTOM, 'Other model ID…');
+    const known = [...modelSelect.options].some((o) => o.value === saved && o.value !== CUSTOM);
+    if (known) {
+      modelSelect.value = saved;
+      modelEl.value = '';
+    } else {
+      modelSelect.value = CUSTOM;
+      modelEl.value = saved;
+    }
+    modelEl.hidden = modelSelect.value !== CUSTOM;
+    providerNote.innerHTML = cfg.note;
+  }
+
+  modelSelect.addEventListener('change', () => {
+    modelEl.hidden = modelSelect.value !== CUSTOM;
+    if (!modelEl.hidden) modelEl.focus();
+    saveSettings();
+  });
+  providerEl.addEventListener('change', () => { applyProvider(); saveSettings(); });
+  [modelEl, maxEl, nEl, stopEl, baseUrlEl, adapterEl].forEach((el) => {
+    el.addEventListener('input', saveSettings);
+    el.addEventListener('change', saveSettings);
+  });
+  tempEl.addEventListener('input', () => { tempOut.textContent = (+tempEl.value).toFixed(2); saveSettings(); });
+  keyEl.addEventListener('input', saveKey);
+  rememberEl.addEventListener('change', saveKey);
+
+  function parseStops(s) {
+    return s.split(',')
+      .map((x) => x.replace(/^ +| +$/g, '').replace(/\\n/g, '\n').replace(/\\t/g, '\t'))
+      .filter((x) => x.length > 0)
+      .slice(0, 4);
+  }
+
+  // ---------- requests ----------
+  class ApiError extends Error {
+    constructor(status, message) { super(message || ''); this.status = status; }
+  }
+
+  function describeError(e, o) {
+    const who = o.cfg.name;
+    const Who = who.charAt(0).toUpperCase() + who.slice(1);
+    if (inFrame || /postMessage|could not be cloned/i.test(String(e && e.message))) return FRAME_MSG;
+    if (e instanceof ApiError) {
+      const m = e.message;
+      const said = m ? ' It said: ' + m : '';
+      if (e.status === 401) return Who + " didn't accept this API key. Check the key, then try again." + said;
+      if (e.status === 402) return 'Your ' + who + ' account is out of credits. Add credits, then try again.' + said;
+      if (e.status === 403) {
+        const gated = o.provider === 'featherless' && /llama/i.test(o.model)
+          ? ' Llama models are gated on Featherless: link a Hugging Face account that has accepted Meta’s license, or pick Qwen/Qwen2.5-72B instead.' : '';
+        return Who + ' refused access to ' + (o.model || 'this model') + '.' + gated + said;
+      }
+      if (e.status === 429) return Who + ' is limiting how many requests you can make. Set Samples to 1, or wait a moment and try again.' + said;
+      if (e.status === 404 || /model/i.test(m)) return Who + ' returned: ' + (m || 'model not found') + ' Check the model name (' + (o.model || 'blank') + ').';
+      return Who + ' returned an error' + (e.status ? ' (' + e.status + ')' : '') + (m ? ': ' + m : '.');
+    }
+    if (e instanceof TypeError) {
+      if (o.provider === 'local') return "Couldn't reach the server at " + o.base + '. Start it by running bash ~/Documents/base-model-lab/start-base-model.sh in Terminal, wait until it says "Starting httpd", and leave that window open.';
+      return "Couldn't reach " + who + '. Check your internet connection, then try again.';
+    }
+    return 'Something went wrong: ' + (e && e.message ? e.message : String(e));
+  }
+
+  function pickText(ch) {
+    if (!ch) return '';
+    if (typeof ch.text === 'string') return ch.text;
+    if (ch.delta && typeof ch.delta.content === 'string') return ch.delta.content;
+    if (ch.message && typeof ch.message.content === 'string') return ch.message.content;
+    return '';
+  }
+
+  // Stop works by cancelling the response stream rather than passing an AbortSignal
+  // to fetch, so the page still works where fetch has been replaced by a wrapper.
+  async function runOne(card, o, signal) {
+    let reader = null;
+    const onAbort = () => { if (reader) reader.cancel().catch(() => {}); };
+    signal.addEventListener('abort', onAbort);
+    try {
+      const body = { prompt: o.prompt, max_tokens: o.max, temperature: o.temp, stream: true };
+      if (o.model) body.model = o.model;
+      if (o.adapter) body.adapters = o.adapter;
+      if (o.stops.length) body.stop = o.stops;
+      const headers = { 'Content-Type': 'application/json' };
+      if (o.key) headers['Authorization'] = 'Bearer ' + o.key;
+      const fetchP = fetch(o.base + '/completions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      // Let Stop take effect before the provider answers; drop the late response.
+      const stopP = new Promise((_, reject) => {
+        const fail = () => { const e = new Error('Stopped'); e.name = 'AbortError'; reject(e); };
+        if (signal.aborted) fail(); else signal.addEventListener('abort', fail, { once: true });
+      });
+      stopP.catch(() => {});
+      let res;
+      try {
+        res = await Promise.race([fetchP, stopP]);
+      } catch (e) {
+        fetchP.then((r) => r.body && r.body.cancel()).catch(() => {});
+        throw e;
+      }
+      if (signal.aborted) { finishCard(card, 'stopped'); return; }
+      if (!res.ok) {
+        let msg = '';
+        try { const j = await res.json(); msg = (j && j.error && j.error.message) || ''; } catch (e) {}
+        throw new ApiError(res.status, msg);
+      }
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('text/event-stream') || !res.body) {
+        const j = await res.json();
+        if (signal.aborted) { finishCard(card, 'stopped'); return; }
+        if (j.error) throw new ApiError(j.error.code || 0, j.error.message);
+        const ch = j.choices && j.choices[0];
+        addText(card, pickText(ch));
+        card.finish = ch && ch.finish_reason;
+        finishCard(card, 'done');
+        return;
+      }
+      reader = res.body.getReader();
+      if (signal.aborted) onAbort();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done || signal.aborted) break;
+        buf += dec.decode(value, { stream: true });
+        let i;
+        while ((i = buf.indexOf('\n')) >= 0) {
+          const line = buf.slice(0, i).trim();
+          buf = buf.slice(i + 1);
+          if (!line || line.startsWith(':') || !line.startsWith('data:')) continue;
+          const data = line.slice(5).trim();
+          if (data === '[DONE]') continue;
+          let j;
+          try { j = JSON.parse(data); } catch (e) { continue; }
+          if (j.error) throw new ApiError(j.error.code || 0, j.error.message);
+          const ch = j.choices && j.choices[0];
+          if (!ch) continue;
+          const t = pickText(ch);
+          if (t) addText(card, t);
+          if (ch.finish_reason) card.finish = ch.finish_reason;
+        }
+      }
+      finishCard(card, signal.aborted ? 'stopped' : 'done');
+    } catch (e) {
+      if (signal.aborted || (e && e.name === 'AbortError')) finishCard(card, 'stopped');
+      else finishCard(card, 'error', describeError(e, o));
+    } finally {
+      signal.removeEventListener('abort', onAbort);
+    }
+  }
+
+  // ---------- continuation cards ----------
+  let controller = null;
+  let batch = null;
+
+  function tail(s, n) { return s.length > n ? '…' + s.slice(s.length - n) : s; }
+
+  function makeCard(b) {
+    const el = document.createElement('article');
+    el.className = 'sample';
+    const pre = document.createElement('p');
+    pre.className = 'sample-text';
+    const ctx = document.createElement('span'); ctx.className = 'ctx'; ctx.textContent = tail(b.prompt, 90);
+    const gen = document.createElement('span'); gen.className = 'gen';
+    const caret = document.createElement('span'); caret.className = 'caret'; caret.setAttribute('aria-hidden', 'true');
+    pre.append(ctx, gen);
+    const foot = document.createElement('div'); foot.className = 'sample-foot';
+    const status = document.createElement('span'); status.className = 'status'; status.textContent = 'Waiting for its turn…';
+    const appendBtn = document.createElement('button'); appendBtn.type = 'button'; appendBtn.className = 'small'; appendBtn.textContent = 'Append to document'; appendBtn.disabled = true;
+    const copyBtn = document.createElement('button'); copyBtn.type = 'button'; copyBtn.className = 'small'; copyBtn.textContent = 'Copy'; copyBtn.disabled = true;
+    foot.append(status, appendBtn, copyBtn);
+    el.append(pre, foot);
+    samplesBox.appendChild(el);
+    const card = { el, pre, gen, caret, status, appendBtn, copyBtn, text: '', state: 'writing', finish: null, appended: false, batch: b };
+    appendBtn.addEventListener('click', () => appendCard(card));
+    copyBtn.addEventListener('click', () => copyCard(card));
+    return card;
+  }
+
+  function startCard(card) {
+    card.status.textContent = 'Writing…';
+    card.pre.appendChild(card.caret);
+  }
+
+  function addText(card, t) {
+    card.text += t;
+    card.gen.textContent = card.text;
+  }
+
+  function finishCard(card, state, errMsg) {
+    card.state = state;
+    card.caret.remove();
+    if (state === 'done') {
+      if (card.finish === 'length') card.status.textContent = 'Stopped at the token limit';
+      else if (card.finish === 'stop') card.status.textContent = card.batch.stops.length ? 'Hit a stop string or ended the document' : 'The model ended the document here';
+      else card.status.textContent = 'Done';
+      if (!card.text) card.status.textContent += ' (wrote nothing)';
+    } else if (state === 'stopped') {
+      card.status.textContent = 'Stopped';
+    } else if (state === 'error') {
+      card.el.classList.add('error');
+      card.status.textContent = 'Failed';
+      const e = document.createElement('span'); e.className = 'err'; e.textContent = errMsg;
+      card.pre.appendChild(e);
+    }
+    refreshAppendState();
+  }
+
+  function refreshAppendState() {
+    if (!batch) return;
+    const current = ta.value === batch.prompt;
+    for (const c of batch.cards) {
+      const can = current && !c.appended && c.state !== 'writing' && c.text.length > 0;
+      c.appendBtn.disabled = !can;
+      c.appendBtn.title = !current && !c.appended ? 'The document has changed since this was written' : '';
+      c.copyBtn.disabled = c.text.length === 0;
+      c.el.classList.toggle('stale', !current && !c.appended);
+    }
+  }
+
+  function appendCard(card) {
+    if (ta.value !== card.batch.prompt || !card.text) return;
+    card.appended = true;
+    card.appendBtn.textContent = 'Appended';
+    card.el.classList.add('appended');
+    insertModelText(card.text);
+    refreshAppendState();
+  }
+
+  async function copyCard(card) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(card.text); ok = true; } catch (e) {
+      const tmp = document.createElement('textarea');
+      tmp.value = card.text; tmp.style.position = 'fixed'; tmp.style.opacity = '0';
+      document.body.appendChild(tmp); tmp.select();
+      try { ok = document.execCommand('copy'); } catch (e2) {}
+      tmp.remove();
+    }
+    card.copyBtn.textContent = ok ? 'Copied' : 'Copy failed';
+    setTimeout(() => { card.copyBtn.textContent = 'Copy'; }, 1500);
+  }
+
+  function setRunning(on) {
+    goBtn.disabled = on;
+    stopBtn.disabled = !on;
+  }
+
+  async function go() {
+    const provider = providerEl.value, cfg = prov();
+    const key = keyEl.value.trim();
+    if (cfg.needsKey && !key) {
+      keyMsg.textContent = 'Paste your ' + cfg.name + ' API key to continue.';
+      keyEl.focus();
+      return;
+    }
+    const model = currentModel();
+    if (provider !== 'local' && !model) {
+      keyMsg.textContent = 'Enter a model ID to continue.';
+      focusModel();
+      return;
+    }
+    const adapter = provider === 'local' ? adapterEl.value.trim() : '';
+    if (adapter && !model) {
+      keyMsg.textContent = 'Pick the model this add-on was trained on.';
+      focusModel();
+      return;
+    }
+    if (adapter && !adapter.startsWith('/')) {
+      keyMsg.textContent = 'Use the add-on folder’s full path, starting with /Users/.';
+      adapterEl.focus();
+      return;
+    }
+    const prompt = ta.value;
+    if (!prompt) { ta.focus(); return; }
+    keyMsg.textContent = '';
+    const base = (provider === 'local' ? (baseUrlEl.value.trim() || cfg.defaultBase) : cfg.base).replace(/\/+$/, '');
+    const o = {
+      provider, cfg, base,
+      key: cfg.needsKey ? key : '',
+      prompt,
+      model,
+      adapter,
+      temp: +tempEl.value,
+      max: Math.max(1, Math.min(4000, Math.round(+maxEl.value) || 200)),
+      stops: parseStops(stopEl.value),
+    };
+    const n = Math.max(1, Math.min(5, +nEl.value || 1));
+    saveSettings();
+    if (controller) controller.abort();
+    const ctl = new AbortController();
+    controller = ctl;
+    batch = { prompt, stops: o.stops, cards: [] };
+    samplesBox.textContent = '';
+    emptyEl.hidden = true;
+    setRunning(true);
+    for (let i = 0; i < n; i++) batch.cards.push(makeCard(batch));
+    const queue = batch.cards.slice();
+    ctl.signal.addEventListener('abort', () => { for (const c of queue.splice(0)) finishCard(c, 'stopped'); }, { once: true });
+    async function worker() {
+      while (queue.length) {
+        const card = queue.shift();
+        if (ctl.signal.aborted) { finishCard(card, 'stopped'); continue; }
+        startCard(card);
+        await runOne(card, o, ctl.signal);
+      }
+    }
+    const workers = [];
+    for (let i = 0; i < Math.min(cfg.parallel, n); i++) workers.push(worker());
+    await Promise.allSettled(workers);
+    if (controller === ctl) setRunning(false);
+    refreshAppendState();
+  }
+
+  goBtn.addEventListener('click', go);
+  stopBtn.addEventListener('click', () => { if (controller) controller.abort(); });
+  document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); if (!goBtn.disabled) go(); }
+    else if (e.key === 'Escape' && !stopBtn.disabled) { controller && controller.abort(); }
+  });
+
+  // ---------- init ----------
+  if (inFrame) {
+    const note = $('#frameNote');
+    note.textContent = FRAME_MSG;
+    note.hidden = false;
+  }
+
+  const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+  $('#kbd').textContent = isMac ? '⌘↵' : 'Ctrl+↵';
+
+  // Earlier versions kept one OpenRouter key under "key" and one model under "model".
+  const oldKey = store.get('key', '');
+  if (oldKey) { store.set('key.openrouter', oldKey); store.del('key'); }
+  const oldSessionKey = session.get('key');
+  if (oldSessionKey && !session.get('key.openrouter')) session.set('key.openrouter', oldSessionKey);
+  if (settings.model !== undefined) { delete settings.model; }
+
+  tempEl.value = settings.temp != null ? settings.temp : 1;
+  tempOut.textContent = (+tempEl.value).toFixed(2);
+  maxEl.value = settings.max || 200;
+  nEl.value = String(settings.n || 3);
+  stopEl.value = settings.stops || '';
+
+  rememberEl.checked = !!store.get('remember', false);
+  providerEl.value = settings.provider;
+  applyProvider();
+
+  const saved = store.get('doc', null);
+  if (saved && typeof saved.text === 'string') {
+    ta.value = saved.text;
+    const L = saved.text.length;
+    ranges = normalize((saved.ranges || []).map((r) => [Math.max(0, Math.min(+r[0] || 0, L)), Math.max(0, Math.min(+r[1] || 0, L))]));
+  } else {
+    ta.value = STARTERS[0].text;
+  }
+  lastText = ta.value;
+  render();
+})();
+</script>
+</body>
+</html>

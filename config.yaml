@@ -1,0 +1,28 @@
+# Settings for training the "excellent prose" add-on.
+# train.sh passes this file to mlx-lm's LoRA trainer.
+
+model: mlx-community/Meta-Llama-3.1-8B-4bit
+train: true
+data: data                  # folder with train.jsonl (282 examples) and valid.jsonl (30)
+adapter_path: adapters/prose
+
+fine_tune_type: lora
+mask_prompt: true           # only the assistant's reply counts toward the loss
+num_layers: 16              # add corrections to the last 16 of the model's 32 layers
+lora_parameters:
+  rank: 8                   # the "skinny" dimension of each correction
+  scale: 20.0               # how strongly the corrections are applied
+  dropout: 0.0
+
+batch_size: 2               # examples per weight update
+iters: 150                  # weight updates; about 1 pass over the training set (run 1 overfit past 100)
+learning_rate: 2e-5         # size of each nudge
+
+steps_per_report: 10        # print the training loss every 10 updates
+steps_per_eval: 50          # score the 30 held-out examples every 50 updates
+val_batches: -1             # use all of them
+save_every: 50              # save a snapshot of the add-on every 50 updates
+
+max_seq_length: 1024
+grad_checkpoint: true       # recompute some values instead of storing them, to save memory
+seed: 0

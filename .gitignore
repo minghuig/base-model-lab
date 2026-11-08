@@ -1,0 +1,8 @@
+# Trained add-ons and their snapshots: about 42 MB each, and easy to remake.
+adapters/
+
+# Overwritten by every training run. Keep a copy in runs/ if it's worth keeping.
+train-log.txt
+
+.DS_Store
+__pycache__/
