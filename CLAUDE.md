@@ -1,7 +1,11 @@
 # Notes for Claude
 
-Start with README.md: it explains the parts, the training format, the mlx-lm
-patches, and results so far.
+Start with README.md for the overview. Then:
+- docs/how-it-works.md: training format, dataset, training settings, the
+  surprise view, and the mlx-lm patches.
+- runs/README.md: every training run's settings, results, and what playing
+  with it showed. Read this before planning the next run.
+- docs/ideas.md: what to try next.
 
 - Ming runs the scripts herself in Terminal on a 16 GB Apple silicon Mac. Give
   her the exact command to run, with the full ~/Documents/base-model-lab/ path.
@@ -17,22 +21,19 @@ patches, and results so far.
   conversations stay put.
 - Give each training run its own adapter_path in config.yaml (adapters/prose,
   adapters/prose-v2, ...). Run length is set by "epochs" (or
-  train.sh --epochs N), which lab_launcher.py turns into mlx-lm's "iters" (and
-  the lr_schedule's "auto" decay steps); don't set iters by hand. pick_checkpoint.sh and list_adapters.sh keep the
-  playground's add-on menu in sync.
+  train.sh --epochs N), which lab_launcher.py turns into mlx-lm's "iters" and
+  the lr_schedule's "auto" decay steps; don't set iters by hand.
+  pick_checkpoint.sh and list_adapters.sh keep the playground's add-on menu
+  in sync.
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.
 - The launchers (server_launcher.py, lab_launcher.py) patch mlx-lm internals,
   written against mlx-lm 0.32.2. If mlx-lm is upgraded, check that the server
   still prints its tokenizer message, then try one continuation and one
   Show surprise.
-- You can test server and training changes without the Mac: MLX runs on Linux
-  CPU (pip install "mlx[cpu]" mlx-lm==0.32.2). Make a tiny randomly
-  initialized llama model (mlx_lm.models.llama) with a small byte-level BPE
-  tokenizer trained on data/ and saved with transformers, then run
-  server_launcher.py or lab_launcher.py against it. That's how the scoring
-  patch and the multi-turn masking were checked.
+- You can test server and training changes without the Mac; see "Testing
+  changes without the Mac" in docs/how-it-works.md.
 - After a training run worth keeping, save a cleaned copy of train-log.txt in
-  runs/ (strip the color codes and progress bars), and add its results to the
-  README, including what samples in the playground showed. Held-out loss
+  runs/ (strip the color codes and progress bars), and add its results to
+  runs/README.md, including what samples in the playground showed. Held-out loss
   alone has misled us before.
