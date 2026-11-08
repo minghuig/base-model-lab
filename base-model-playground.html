@@ -97,6 +97,8 @@
   #adapterSelect { max-width: min(260px, 80vw); }
   #adapter { width: min(260px, 80vw); }
   #adapter[hidden] { display: none; }
+  .adapter-note { margin: 0; max-width: 260px; font-size: 12px; color: var(--muted); }
+  .adapter-note:empty { display: none; }
   .provider-note { flex-basis: 100%; margin: -2px 0 0; font-size: 13px; color: var(--muted); max-width: 110ch; }
   .provider-note:empty { display: none; }
   .provider-note code { font: 12.5px var(--mono); color: var(--graphite); }
@@ -271,6 +273,7 @@
           <select id="adapterSelect"></select>
           <input id="adapter" type="text" spellcheck="false" placeholder="Full folder path" aria-label="Add-on folder path" hidden>
         </div>
+        <p class="adapter-note" id="adapterNote" aria-live="polite"></p>
       </div>
       <p class="key-msg" id="keyMsg" role="alert"></p>
     </div>
@@ -418,6 +421,7 @@
   }
   const adapterField = $('#adapterField'), adapterEl = $('#adapter'), adapterSelect = $('#adapterSelect');
   const OTHER_ADAPTER = '__other__';
+  const adapterNote = $('#adapterNote');
 
   // The add-on menu, plus a text box that appears when "Other folder…" is picked.
   function currentAdapter() {
@@ -682,8 +686,25 @@
   modelSelect.addEventListener('change', () => {
     modelEl.hidden = modelSelect.value !== CUSTOM;
     if (!modelEl.hidden) modelEl.focus();
+    matchAdapterToModel();
     saveSettings();
   });
+  modelEl.addEventListener('change', () => { matchAdapterToModel(); saveSettings(); });
+
+  // An add-on only fits the model it was trained on. If the model changes to a
+  // different one, the add-on goes back to None, with a note saying why.
+  function matchAdapterToModel() {
+    adapterNote.textContent = '';
+    if (providerEl.value !== 'local') return;
+    const a = foundAdapters.find((x) => x.path === currentAdapter());
+    if (!a || !a.model || a.model === currentModel()) return;
+    const label = [...modelSelect.options].find((o) => o.value === a.model);
+    adapterSelect.value = '';
+    adapterEl.hidden = true;
+    adapterSelect.title = '';
+    adapterNote.textContent = 'Set to None: ' + (a.name || baseName(a.path)) + ' was trained on ' +
+      (label ? label.textContent : a.model) + '.';
+  }
   // ---------- trained add-ons ----------
   // Two sources: adapters/index.js, which list_adapters.sh writes into the lab
   // folder (pick_checkpoint.sh and train.sh run it), and add-ons that worked
@@ -761,6 +782,7 @@
     return adapterSelect.options.length ? currentAdapter() : (settings.adapter || '');
   }
   adapterSelect.addEventListener('change', () => {
+    adapterNote.textContent = '';
     adapterEl.hidden = adapterSelect.value !== OTHER_ADAPTER;
     if (!adapterEl.hidden) adapterEl.focus();
     adapterSelect.title = adapterSelect.value && adapterSelect.value !== OTHER_ADAPTER ? adapterSelect.value : '';
@@ -812,8 +834,12 @@
     const Who = who.charAt(0).toUpperCase() + who.slice(1);
     if (inFrame || /postMessage|could not be cloned/i.test(String(e && e.message))) return FRAME_MSG;
     if (e instanceof ApiError) {
-      const m = e.message;
+      const m = e.message.length > 300 ? e.message.slice(0, 300) + '…' : e.message;
       const said = m ? ' It said: ' + m : '';
+      if (o.adapter && /incompatible tensors|does not match model parameter shape|not an adapter parameter/i.test(e.message)) {
+        return 'The add-on ' + baseName(o.adapter) + ' doesn’t fit ' + (o.model || 'this model') +
+          ': an add-on only works with the model it was trained on. Set Trained add-on to None, or switch back to its model.';
+      }
       if (e.status === 401) return Who + " didn't accept this API key. Check the key, then try again." + said;
       if (e.status === 402) return 'Your ' + who + ' account is out of credits. Add credits, then try again.' + said;
       if (e.status === 403) {

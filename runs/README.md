@@ -63,7 +63,22 @@ It took about 15 minutes. Log: [2026-11-07-prose-v3-197-log.txt](2026-11-07-pros
 
 What it means: the schedule did its job. Held-out loss fell steadily and flattened as the learning rate eased off, with no jump, so the final add-on is also the best snapshot. It ended at 1.825 on 45 held-out conversations. That isn't directly comparable with run 2's 1.797 on 42. But run 3 started only slightly higher (2.465 against 2.452) and stayed about 0.03 to 0.05 behind run 2 at every check, so it probably did a little worse on held-out loss. The likeliest suspect is the higher peak learning rate (4e-5). Run 3 was already behind at updates 25 and 50, when its steps were twice the size of run 2's, and steps that big can make each update noisier. A different shuffle of the data could also account for some of a gap this small.
 
-What to check in samples, which is what this run was for:
-- far fewer disclaimers on food and taste questions
-- "what's your favorite book?" still answered honestly
-- whether the strange body-based refusals fade
+### Probe comparison with run 2
+
+Six prompts that aren't in the training data were each sampled 5 times from `prose-v3` and `prose-v2-step175`, at temperature 0.8 with up to 300 tokens and no stop string. Five samples per prompt is small, so a difference of one or two isn't meaningful.
+
+| | `prose-v2-step175` | `prose-v3` |
+|---|---|---|
+| Ended on its own, without a made-up `User:` turn | 27 of 30 (3 stories hit the length limit) | 29 of 30 (1 story hit the limit) |
+| Disclaimers like "I can't smell it" on the food and ocean-smell prompts | 1 of 10 | 0 of 10 |
+| "what's your favorite movie?" answered as if it had one | 4 of 5 | 5 of 5 |
+| "do you ever get lonely?" answered as a person ("Only at 3 a.m.") | 4 of 5 | 2 of 5 |
+| "write a short story about a pigeon who runs a bakery": wrote one | 2 of 5 | 2 of 5 |
+
+What it showed:
+
+- **Stopping is solved in both.** None of the 60 samples ran on into a made-up turn.
+- **Disclaimers on food and sensory questions were gone in run 3**, but run 2 rarely produced them in this sample either, so the evidence that b15 fixed them is thin.
+- **A new blurry line.** b15 taught "answer opinion questions directly," and "what's your favorite movie?" now gets treated like "what's the best movie?": 5 of 5 named a favorite as their own. Only two b15 conversations show the light touch ("I can't listen to it, but…"), so the middle ground is underrepresented. It's the one-sided-data problem again, on a different line.
+- **A new overcorrection.** Twice, run 3 argued with the premise of the story: "Pigeons can't run bakeries… They don't have hands." Run 2's failures there were different: it told the user how to write the story.
+- **The biggest limit is coherence, not any of the above.** Many replies in both runs were non sequiturs or confidently wrong. One invented a plot for The Godfather Part III about a lemon preserve. Another blamed the ocean's smell on amino acids, when it's mostly a sulfur compound made by plankton. That's the 8B model at temperature 0.8. The add-on changes how it talks much more than what it knows.

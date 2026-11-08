@@ -68,7 +68,7 @@ python3 dataset_src/build_dataset.py
 - **Snapshots and held-out scores** come every 25 updates, so a run can be cut short after the fact with `pick_checkpoint.sh`.
 - **Each run gets its own folder**, `adapter_path` in `config.yaml`: `adapters/prose`, `adapters/prose-v2`, and so on. If the folder already has an add-on, `train.sh` asks before renaming the old one.
 
-Snapshots are about 42 MB each. `list_adapters.sh` writes `adapters/index.js`, which has this Mac's paths in it. The playground reads that file to fill its add-on menu, and picking an add-on also picks the model it was trained on.
+Snapshots are about 42 MB each. `list_adapters.sh` writes `adapters/index.js`, which has this Mac's paths in it. The playground reads that file to fill its add-on menu. Picking an add-on also picks the model it was trained on, and switching to a different model sets the add-on back to None, since an add-on only fits the model it was trained on.
 
 ## The surprise view
 
