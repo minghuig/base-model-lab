@@ -46,7 +46,7 @@ Playing with update 175:
 - **The voice drifted toward generic chatbot.** It used markdown bullets and stock phrases like "I hope you enjoy them," which appear nowhere in the data. The more the model sees itself as an AI assistant, the more it borrows that character's habits from web text.
 - **Explicit-story requests got improvised refusals.** These were rare in run 1 and fairly common in run 2. They came with body-based reasons ("I don't have any sex organs"), and sometimes the model wrote something story-like anyway. No conversation involves content refusals. The model seems to have combined the base model's picture of how AI assistants answer such requests with run 2's "I can't X, but I can Y" template. Nothing teaches it a policy, so it doesn't follow one.
 
-## Run 3, set up and not yet run: `adapters/prose-v3`
+## Run 3, 2026-11-07: `adapters/prose-v3`
 
 Changes from run 2:
 
@@ -55,7 +55,15 @@ Changes from run 2:
 
 That's two changes at once, so a difference from run 2 can't be credited to either alone. The disclaimer behavior is almost certainly down to the data. On purpose, nothing trains how to handle explicit requests either way. How that behavior shifts as a side effect is part of what to watch.
 
-What to check:
+It took about 15 minutes. Log: [2026-11-07-prose-v3-197-log.txt](2026-11-07-prose-v3-197-log.txt).
+
+| Update | start | 25 | 50 | 75 | 100 | 125 | 150 | 175 | **197** |
+|---|---|---|---|---|---|---|---|---|---|
+| Held-out loss | 2.465 | 1.962 | 1.918 | 1.876 | 1.864 | 1.843 | 1.833 | 1.826 | **1.825** |
+
+What it means: the schedule did its job. Held-out loss fell steadily and flattened as the learning rate eased off, with no jump, so the final add-on is also the best snapshot. It ended at 1.825 on 45 held-out conversations. That isn't directly comparable with run 2's 1.797 on 42. But run 3 started only slightly higher (2.465 against 2.452) and stayed about 0.03 to 0.05 behind run 2 at every check, so it probably did a little worse on held-out loss. The likeliest suspect is the higher peak learning rate (4e-5). Run 3 was already behind at updates 25 and 50, when its steps were twice the size of run 2's, and steps that big can make each update noisier. A different shuffle of the data could also account for some of a gap this small.
+
+What to check in samples, which is what this run was for:
 - far fewer disclaimers on food and taste questions
 - "what's your favorite book?" still answered honestly
 - whether the strange body-based refusals fade

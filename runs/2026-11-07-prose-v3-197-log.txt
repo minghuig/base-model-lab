@@ -1,0 +1,52 @@
+One epoch (a pass over all 393 training conversations, 2 per update) is 197 updates. Training for 1 epoch: 197 updates.
+Loading configuration file /var/folders/mh/rv80wwj121q854k882vp88r80000gn/T/lab-config-ftj_97hm.yaml
+Loading pretrained model
+
+Loading datasets
+Training
+╭─ mlx_lm.lora ────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│    model           mlx-community/Meta-Llama-3.1-8B-4bit                                                              │
+│    type            lora · 16 layers · rank 8                                                                         │
+│    dataset         data                                                                                              │
+│    optimizer       adam · lr 4.0e-05                                                                                 │
+│    batch · iters   2 · 197                                                                                           │
+│    max seq         1,024                                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Trainable parameters: 0.131% (10.486M/8030.261M)
+  iter   train_loss     tok/s     tokens
+     1    val 2.465    28.76s
+    10    2.211 ▼       62      1.9k
+    20    1.958 ▼       59      3.7k
+    25    val 1.962    27.27s
+  save  0000025_adapters.safetensors
+    30    1.972 ▲       70      5.8k
+    40    2.026 ▲       64      7.6k
+    50    val 1.918    27.21s
+    50    2.033 ▲       71      9.9k
+  save  0000050_adapters.safetensors
+    60    1.849 ▼       56     11.8k
+    70    1.961 ▲       68     14.0k
+    75    val 1.876    28.78s
+  save  0000075_adapters.safetensors
+    80    2.047 ▲       55     15.8k
+    90    1.955 ▼       64     18.0k
+   100    val 1.864    31.08s
+   100    1.823 ▼       60     20.1k
+  save  0000100_adapters.safetensors
+   110    1.923 ▲       59     21.9k
+   120    1.922 ▼       68     24.0k
+   125    val 1.843    28.34s
+  save  0000125_adapters.safetensors
+   130    1.857 ▼       63     25.9k
+   140    1.709 ▼       57     27.4k
+   150    val 1.833    28.05s
+   150    1.898 ▲       60     29.3k
+  save  0000150_adapters.safetensors
+   160    1.982 ▲       66     31.5k
+   170    1.851 ▼       69     33.5k
+   175    val 1.826    28.90s
+  save  0000175_adapters.safetensors
+   180    1.933 ▲       62     35.3k
+   190    1.906 ▼       64     37.5k
+   197    val 1.825    27.99s
+   197    1.882 ▼       59     38.8k
