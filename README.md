@@ -4,7 +4,7 @@ Hands-on experiments with language models on a 16 GB Apple silicon MacBook Pro: 
 
 - **A playground** (`base-model-playground.html`). Write the start of a document and a base model continues it. It works with a server on this Mac, OpenRouter or Featherless. With the local server, **Show surprise** colors each token by how unlikely the model found it.
 - **A local server** (`start-base-model.sh`). It runs Mistral Nemo 12B base and Llama 3.1 8B base with mlx-lm, with or without a trained add-on.
-- **A fine-tune** (`train.sh`). A LoRA add-on teaches Llama 3.1 8B base to answer as an assistant that writes plainly and well, trained on 438 conversations written for this.
+- **A fine-tune** (`train.sh`). A LoRA add-on teaches Llama 3.1 8B base, or Mistral Nemo 12B base, to answer as an assistant that writes plainly and well, trained on 438 conversations written for this.
 - **Preference tuning** (`dpo.sh`). The playground's **Compare** mode writes two replies; you pick the better one, and DPO trains the add-on toward your picks.
 
 ## Quick start
@@ -20,6 +20,8 @@ To train an add-on, first stop the server with Control-C, because training needs
 ```
 bash ~/Documents/base-model-lab/train.sh
 ```
+
+That trains on Llama. To train the same add-on on Nemo, add `--config config-nemo.yaml`. It's slower and needs more memory, so close big apps like browsers first.
 
 Then restart the server and pick the new add-on from the playground's **Trained add-on** menu. Leave **Stop at** empty, and prompt it in the training format:
 
@@ -45,7 +47,7 @@ It trains `adapters/prose-v3-dpo` from `prose-v3`; `dpo.yaml` sets which add-on 
 |---|---|
 | `base-model-playground.html` | The playground: one HTML file, no build step. API keys stay in the browser. |
 | `start-base-model.sh`, `server_launcher.py` | Install, download, and start `mlx_lm.server` with the lab's fixes and scoring. |
-| `train.sh`, `lab_launcher.py`, `config.yaml` | Train an add-on with `mlx_lm.lora`, in the lab's chat format. |
+| `train.sh`, `lab_launcher.py`, `config.yaml`, `config-nemo.yaml` | Train an add-on with `mlx_lm.lora`, in the lab's chat format, on Llama (`config.yaml`) or Nemo. |
 | `dpo.sh`, `dpo_train.py`, `dpo.yaml` | Preference tuning (DPO) from the pairs picked in Compare mode. |
 | `prefs/` | `prompts.js`, the prompts Compare mode uses, and `pairs.jsonl`, your picks. |
 | `pick_checkpoint.sh`, `list_adapters.sh` | Turn a snapshot into an add-on, and keep the playground's add-on menu up to date. |

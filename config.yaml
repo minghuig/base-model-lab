@@ -1,5 +1,6 @@
-# Settings for training the "excellent prose" add-on.
-# train.sh passes this file to mlx-lm's LoRA trainer.
+# Settings for training the "excellent prose" add-on on Llama 3.1 8B base.
+# train.sh passes this file to mlx-lm's LoRA trainer. config-nemo.yaml is the
+# same recipe on Mistral Nemo 12B base.
 
 model: mlx-community/Meta-Llama-3.1-8B-4bit
 train: true

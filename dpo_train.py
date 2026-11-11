@@ -117,6 +117,12 @@ def tokenize_reply(tokenizer, prompt, reply, max_len):
     return ids, start
 
 
+def peak_gb():
+    """The most memory MLX has held at once so far, in GB."""
+    f = getattr(mx, "get_peak_memory", None) or getattr(getattr(mx, "metal", None), "get_peak_memory", None)
+    return f() / 1e9 if f else float("nan")
+
+
 def reply_logprob(model, ids, start):
     """Sum of log-probabilities of ids[start:], each given everything before it."""
     x = mx.array(ids[:-1])[None]
@@ -187,6 +193,9 @@ def main():
         mx.eval(rc, rr)
         ex["ref"] = (rc.item(), rr.item())
     print(f"Done in {time.time() - t0:.0f}s.")
+    clear = getattr(mx, "clear_cache", None) or getattr(getattr(mx, "metal", None), "clear_cache", None)
+    if clear:
+        clear()
 
     beta = cfg["beta"]
 
@@ -256,7 +265,7 @@ def main():
                 avg_loss = sum(s[0] for s in stats) / len(stats)
                 acc = sum(s[1] > 0 for s in stats) / len(stats)
                 print(f"epoch {epoch} update {update}: loss {avg_loss:.3f}, prefers your pick on {acc * 100:.0f}% of this update's pairs "
-                      f"({time.time() - t0:.0f}s)")
+                      f"({time.time() - t0:.0f}s, peak memory {peak_gb():.1f} GB)")
         m = evaluate(train)
         report(f"epoch {epoch}, training pairs", m)
         if valid:
@@ -275,7 +284,7 @@ def main():
     }
     with open(os.path.join(out_dir, "adapter_config.json"), "w") as f:
         json.dump(adapter_cfg, f, indent=4)
-    print(f"\nSaved the add-on to {out_dir}.")
+    print(f"\nSaved the add-on to {out_dir}. Peak memory: {peak_gb():.1f} GB.")
 
 
 if __name__ == "__main__":

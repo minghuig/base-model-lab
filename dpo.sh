@@ -65,10 +65,32 @@ Training on $COUNT pairs, starting from $(basename "$START"). What to watch:
     is learning what you like rather than memorizing these particular replies.
   - "chosen" and "rejected" show how each reply's score changed. Often both
     fall, with the rejected one falling faster; that's normal for this method.
+If your Mac is plugged in, you can close the lid once training starts. It keeps
+running, and with the screen off macOS won't interrupt it.
 
 GUIDE
 
-"$TOOL_PY" dpo_train.py --config dpo.yaml 2>&1 | tee dpo-log.txt
+# macOS stops any GPU job that holds up drawing the screen for too long
+# ("Impacting Interactivity"); long training sequences can trip it. This Apple
+# driver setting relaxes that limit, and caffeinate keeps the Mac awake if you
+# close the lid, which turns the screen off and removes the problem entirely.
+export AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1
+KEEP_AWAKE=""
+if command -v caffeinate >/dev/null 2>&1; then KEEP_AWAKE="caffeinate -is"; fi
+gpu_stopped() {
+  if grep -q "Impacting Interactivity" "$1" 2>/dev/null; then
+    echo
+    echo "macOS stopped the training because it was holding up the screen. To get around it:"
+    echo "plug in your Mac, run this again, and once it says it's training, close the lid."
+    echo "It keeps running with the lid closed (while plugged in), and the screen being off"
+    echo "removes the problem. The log is saved in $1."
+  fi
+}
+
+if ! $KEEP_AWAKE "$TOOL_PY" dpo_train.py --config dpo.yaml 2>&1 | tee dpo-log.txt; then
+  gpu_stopped dpo-log.txt
+  exit 1
+fi
 bash list_adapters.sh > /dev/null
 
 cat <<EOF2

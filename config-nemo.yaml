@@ -1,0 +1,37 @@
+# The "excellent prose" add-on on Mistral Nemo 12B base: run 3's recipe
+# (config.yaml) with only the model and the folder changed, so a difference
+# from prose-v3 comes from the base model. Train it with:
+#   bash ~/Documents/base-model-lab/train.sh --config config-nemo.yaml
+
+model: mlx-community/Mistral-Nemo-Base-2407-4bit
+train: true
+data: data                  # folder with train.jsonl (393 conversations) and valid.jsonl (45)
+adapter_path: adapters/nemo-prose
+
+fine_tune_type: lora
+mask_prompt: true           # only the assistant's reply counts toward the loss
+num_layers: 16              # add corrections to the last 16 of the model's 40 layers, like Llama's
+lora_parameters:
+  rank: 8                   # the "skinny" dimension of each correction
+  scale: 20.0               # how strongly the corrections are applied
+  dropout: 0.0
+
+batch_size: 2               # examples per weight update
+epochs: 1                   # passes over the training set (train.sh --epochs N overrides it);
+                            # lab_launcher.py turns this into mlx-lm's "iters"
+                            # (one epoch is 197 updates at 393 conversations)
+learning_rate: 4e-5         # size of each nudge, at its peak (see lr_schedule)
+lr_schedule:                # warm up over 10 updates, then ease the step size down to almost
+  name: cosine_decay        # nothing by the last update, so the final add-on is a settled
+  warmup: 10                # "has seen everything once" and there's no snapshot to pick.
+  warmup_init: 0.0          # The peak is twice run 2's 2e-5 because easing off roughly
+  arguments: [4e-5, auto, 1e-7]   # halves the average step. "auto": the updates after warmup.
+
+steps_per_report: 10        # print the training loss every 10 updates
+steps_per_eval: 25          # score the 45 held-out conversations every 25 updates
+val_batches: -1             # use all of them
+save_every: 25              # save a snapshot of the add-on every 25 updates
+
+max_seq_length: 1024
+grad_checkpoint: true       # recompute some values instead of storing them, to save memory
+seed: 0

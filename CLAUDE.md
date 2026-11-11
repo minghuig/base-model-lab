@@ -19,8 +19,14 @@ Start with README.md for the overview. Then:
   (user, reply) pairs or lists of alternating turns; only the last reply is
   trained. Add new batches with a higher number so earlier held-out
   conversations stay put.
+- Long training sequences can trip macOS's GPU watchdog with the screen on
+  ("Impacting Interactivity"); the first DPO run (replies up to ~1,100
+  tokens) died at update 1. train.sh and dpo.sh set
+  AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1 and run under caffeinate -is; the sure fix
+  is plugged in with the lid closed. Keep that in any new training script.
 - Give each training run its own adapter_path in config.yaml (adapters/prose,
-  adapters/prose-v2, ...). Run length is set by "epochs" (or
+  adapters/prose-v2, ...), or in config-nemo.yaml for Nemo runs
+  (train.sh --config config-nemo.yaml). Run length is set by "epochs" (or
   train.sh --epochs N), which lab_launcher.py turns into mlx-lm's "iters" and
   the lr_schedule's "auto" decay steps; don't set iters by hand.
   pick_checkpoint.sh and list_adapters.sh keep the playground's add-on menu
