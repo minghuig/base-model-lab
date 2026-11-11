@@ -120,6 +120,9 @@ echo
 # driver setting relaxes that limit, and caffeinate keeps the Mac awake if you
 # close the lid, which turns the screen off and removes the problem entirely.
 export AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1
+# Print each line as it happens; piped into tee, Python would otherwise hold
+# its output back until it had a big chunk or finished.
+export PYTHONUNBUFFERED=1
 KEEP_AWAKE=""
 if command -v caffeinate >/dev/null 2>&1; then KEEP_AWAKE="caffeinate -is"; fi
 gpu_stopped() {

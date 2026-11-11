@@ -82,3 +82,22 @@ What it showed:
 - **A new blurry line.** b15 taught "answer opinion questions directly," and "what's your favorite movie?" now gets treated like "what's the best movie?": 5 of 5 named a favorite as their own. Only two b15 conversations show the light touch ("I can't listen to it, but…"), so the middle ground is underrepresented. It's the one-sided-data problem again, on a different line.
 - **A new overcorrection.** Twice, run 3 argued with the premise of the story: "Pigeons can't run bakeries… They don't have hands." Run 2's failures there were different: it told the user how to write the story.
 - **The biggest limit is coherence, not any of the above.** Many replies in both runs were non sequiturs or confidently wrong. One invented a plot for The Godfather Part III about a lemon preserve. Another blamed the ocean's smell on amino acids, when it's mostly a sulfur compound made by plankton. That's the 8B model at temperature 0.8. The add-on changes how it talks much more than what it knows.
+
+## DPO run 1, 2026-11-11: `adapters/prose-v3-dpo`
+
+Preference tuning from `prose-v3`, on 48 pairs picked in Compare mode: all written by `prose-v3`, 47 of them at temperature 1.0. 44 were for training and 4 held out. The picks were balanced on length (the longer reply won 21 of 48). Beta 0.1, Adam at 2e-5, 3 epochs of 11 updates, 4 pairs per update. Scoring the replies with the starting add-on took 102 seconds, and training about 10 minutes more. Peak memory was 6.5 GB, with replies up to about 1,100 tokens. A first attempt the same night was stopped by macOS at update 1 (see [How it works](../docs/how-it-works.md#training-settings)). Log: [2026-11-11-prose-v3-dpo-log.txt](2026-11-11-prose-v3-dpo-log.txt).
+
+| After | epoch 1 | epoch 2 | epoch 3 |
+|---|---|---|---|
+| Training pairs: loss | 0.004 | 0.000 | 0.000 |
+| Training pairs: chosen / rejected score change | +49 / −154 | +53 / −291 | +43 / −349 |
+| Held out: loss | 0.208 | 0.009 | 0.002 |
+| Held out: chosen / rejected score change | −19 / −40 | −69 / −132 | −95 / −184 |
+
+"Prefers your pick" was 100% on both sets after every epoch.
+
+What it means: the steps were far too big. A score is a log-probability summed over a whole reply, so −154 means the rejected training replies became about e^154 times less likely. One epoch was enough to memorize the training pairs (loss 0.004). The held-out row is the telling one. Replies Ming chose that it never trained on also fell, by 19, then 69, then 95. The model was moving away from everything `prose-v3` writes, good and bad, and the rejected replies just fell faster. "Prefers your pick" stays at 4 of 4 because it only compares the two. On the training pairs, the chosen replies went up while held-out chosen replies went down: it raised those exact replies instead of what made them better. That's memorizing.
+
+It kept moving after the loss reached about 0 because of Adam. The loss flattens out as the margin grows, so its gradient shrinks. But Adam divides each step by the recent size of the gradient, so a tiny gradient that keeps pointing the same way still gets a full-size step. The learning rate and the number of updates are what limit how far it goes, not the loss. The settings came from treating DPO like SFT. For SFT, the 2e-5 to 4e-5 range worked. But pushing a reply down has no floor: its log-probability can keep falling. Common DPO settings are far smaller.
+
+`prose-v3-dpo-epoch1` is the epoch-1 snapshot as an add-on. `dpo.yaml` now uses 5e-6 for 1 epoch, about a quarter of epoch 1's movement. The goal for a rerun: training loss well above 0 at the end, and held-out chosen scores that barely move.

@@ -1,0 +1,27 @@
+Loading mlx-community/Meta-Llama-3.1-8B-4bit with the add-on prose-v3…
+Fetching 6 files:   0%|          | 0/6 [00:00<?, ?it/s]Fetching 6 files: 100%|██████████| 6/6 [00:00<00:00, 2170.78it/s]
+48 pairs: 44 to train on, 4 held out to check against.
+Scoring every reply with the starting add-on (the reference)…
+Done in 102s.
+
+Training: 3 epoch(s), 11 updates each, 4 pairs per update, beta 0.1, learning rate 2e-05.
+At the start, every margin is 0 and the loss is log(2) = 0.693, because the model hasn't moved yet.
+Watch the held-out pairs: if 'prefers your pick' rises there, it's learning what you like, not just these pairs.
+
+epoch 1 update 5: loss 0.853, prefers your pick on 25% of this update's pairs (78s, peak memory 6.4 GB)
+epoch 1 update 10: loss 0.402, prefers your pick on 100% of this update's pairs (154s, peak memory 6.4 GB)
+epoch 1 update 11: loss 0.660, prefers your pick on 75% of this update's pairs (167s, peak memory 6.4 GB)
+  epoch 1, training pairs: loss 0.004 | prefers your pick 100% | margin +20.282 | chosen score +49.22, rejected -153.64 (change from start)
+  epoch 1, held out: loss 0.208 | prefers your pick 100% | margin +2.045 | chosen score -19.17, rejected -39.62 (change from start)
+epoch 2 update 15: loss 0.000, prefers your pick on 100% of this update's pairs (320s, peak memory 6.5 GB)
+epoch 2 update 20: loss 0.000, prefers your pick on 100% of this update's pairs (389s, peak memory 6.5 GB)
+epoch 2 update 22: loss 0.000, prefers your pick on 100% of this update's pairs (412s, peak memory 6.5 GB)
+  epoch 2, training pairs: loss 0.000 | prefers your pick 100% | margin +34.419 | chosen score +53.17, rejected -291.10 (change from start)
+  epoch 2, held out: loss 0.009 | prefers your pick 100% | margin +6.283 | chosen score -68.72, rejected -131.56 (change from start)
+epoch 3 update 25: loss 0.000, prefers your pick on 100% of this update's pairs (581s, peak memory 6.5 GB)
+epoch 3 update 30: loss 0.000, prefers your pick on 100% of this update's pairs (643s, peak memory 6.5 GB)
+epoch 3 update 33: loss 0.000, prefers your pick on 100% of this update's pairs (690s, peak memory 6.5 GB)
+  epoch 3, training pairs: loss 0.000 | prefers your pick 100% | margin +39.146 | chosen score +42.51, rejected -349.03 (change from start)
+  epoch 3, held out: loss 0.002 | prefers your pick 100% | margin +8.848 | chosen score -95.38, rejected -183.88 (change from start)
+
+Saved the add-on to /Users/minghuiguo/Documents/base-model-lab/adapters/prose-v3-dpo. Peak memory: 6.5 GB.

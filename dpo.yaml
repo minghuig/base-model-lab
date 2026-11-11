@@ -8,11 +8,13 @@ pairs: prefs/pairs.jsonl              # your picks from the playground's Compare
 beta: 0.1                   # the leash: how much a reply's score has to change to count.
                             # Lower lets the model move further from the start.
 # How far training moves the model is roughly learning_rate x number of updates,
-# and updates = epochs x pairs / pairs_per_update. These suit about 50 pairs
-# (3 x 43 / 4 = about 33 updates). For 150 pairs, 1e-5 and 2 epochs give about
-# the same total.
-learning_rate: 2e-5         # step size per update; SFT used 4e-5
-epochs: 3                   # passes over the pairs; each pass also saves epochN_adapters.safetensors
+# and updates = epochs x pairs / pairs_per_update. DPO run 1 (2e-5, 3 epochs of
+# 11 updates) went far too far: one epoch memorized the pairs, and replies you
+# liked that it never trained on became much less likely too (runs/README.md).
+# 5e-6 for one epoch is about a quarter of that first epoch. With more pairs,
+# keep learning_rate x updates about the same.
+learning_rate: 5e-6         # step size per update
+epochs: 1                   # passes over the pairs; each pass also saves epochN_adapters.safetensors
 pairs_per_update: 4         # pairs averaged into each nudge
 valid_fraction: 0.1         # share of pairs held out to check against (with 10 or more)
 max_seq_length: 1024        # longer prompt + reply are cut to this many tokens
