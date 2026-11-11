@@ -76,6 +76,29 @@ Snapshots are about 42 MB each. `list_adapters.sh` writes `adapters/index.js`, w
 
 With nothing selected, it scores the text the model wrote and shows your text in gray for context, without counting it, the way training only scores the reply. Select some text to score exactly that instead. The average it reports is the same loss training reports: the average of minus the log of these probabilities.
 
+## Preference tuning (Compare and DPO)
+
+SFT shows the model good replies and makes them more likely. Preference tuning shows it two of its own replies to the same prompt and which one you liked, and makes the liked one more likely relative to the other. It teaches the difference between two replies the model would actually write, which is often subtler than anything easy to write down as an example.
+
+**Collecting pairs.** In the playground, pick the add-on to improve (normally the one `dpo.yaml` starts from), then press **Compare**. It writes two replies to the same prompt with your current temperature and max tokens. Press **A is better** or **B is better** (or the 1 and 2 keys) and it saves the pair and moves to the next prompt. **Skip** (S) moves on without saving, for when neither is better or both are bad; **New pair** writes two fresh replies to the same prompt. Prompts come from `prefs/prompts.js`, or choose **The document** to use what's in the document box. The list has 196 prompts, none of them in the training data or the probes; the last 44 aim at what the run 3 probes showed, including eight short conversations, where the replies answer a follow-up. An entry is a question or a conversation written as `[user, assistant, user]`, and the playground keeps your place in the list, so add new ones at the end. The server appends each pair to `prefs/pairs.jsonl`, one JSON object per line, with the prompt, both replies, how each ended (stopped on its own, or hit the length limit), and the model, add-on and settings that wrote them. This file is your picks: keep it, and don't regenerate it.
+
+What makes a useful pick: judge the whole reply, including whether it stopped in the right place. If the two are nearly the same, skip; a pair only teaches the difference between its two replies. Aim for 100 to 200 pairs. Training refuses to start with fewer than 20.
+
+**Training.** Stop the server, then run `dpo.sh`. It trains a copy of the starting add-on with DPO (direct preference optimization):
+
+1. A reply's score is the log of the probability the model gives it: the sum, over its tokens, of the log-probability of each token given everything before it. These are the numbers Show surprise colors. A reply that stopped on its own includes the end-of-text token, so stopping is part of what's scored.
+2. Before training, the starting add-on scores every reply once. That's the reference.
+3. For each pair, `margin = beta × ((chosen now − chosen before) − (rejected now − rejected before))`, and the loss is `−log(sigmoid(margin))`. It starts at log 2 = 0.693, when nothing has moved, falls as the model moves toward your pick and away from the other, and flattens out as the margin grows. So there's little to gain from pushing any one pair to extremes. That, and beta, keep the model close to where it started.
+4. Nudge the add-on's numbers to lower the loss, averaged over 4 pairs at a time.
+
+Classic RLHF trains a separate reward model on the pairs and then runs reinforcement learning (PPO) against it, sampling new replies as it goes. DPO reaches a mathematically similar result directly from the pairs, with one model in memory, which is what fits on 16 GB. The trade-off is that it learns only from the replies you judged, not from new ones it writes during training.
+
+The log reports, for the training pairs and for 10% held out: the loss, **prefers your pick** (the share of pairs where the model has moved toward your choice more than toward the other), the average margin, and how each reply's score changed. Often both scores fall, the rejected one faster. That's normal for DPO, but if the chosen score falls a lot, the model is drifting from everything it used to write, not just the rejected replies. The held-out numbers are the honest check: if "prefers your pick" rises there, it's learning what you like rather than these exact replies. With few pairs the held-out set is small, so its numbers jump around.
+
+Settings are in `dpo.yaml`: `beta` 0.1, learning rate 1e-5 (a quarter of SFT's), 2 epochs. The result goes to `adapters/prose-v3-dpo`, with a snapshot after each epoch (`epoch1_adapters.safetensors`). To try the epoch-1 snapshot, copy the folder and rename that file to `adapters.safetensors` in the copy, then run `list_adapters.sh`. If an add-on is already in the output folder, `dpo.sh` asks, then renames the old one with the date and time rather than overwriting it. The new add-on's `adapter_config.json` records what it was trained from, under `dpo`.
+
+DPO only knows what the pairs show. If every pair you prefer is the shorter reply, it may learn "shorter" rather than "better". Mixing in pairs where the longer reply wins keeps it honest, as the contrast examples did for SFT.
+
 ## Fixes on top of mlx-lm
 
 Both launchers patch mlx-lm at startup: `server_launcher.py` for the server and `lab_launcher.py` for training. The server prints a line in parentheses when it fixes a tokenizer, and another if a patch can't be applied.
@@ -84,11 +107,12 @@ Both launchers patch mlx-lm at startup: `server_launcher.py` for the server and 
 2. **The first word's leading space.** mlx_lm.server's streaming detokenizer trims the space before the first generated token. In a completion, that glued the continuation onto the prompt. The server patch turns the trim off.
 3. **Chat template (training only).** `lab_launcher.py` gives the tokenizer the template above, so mlx_lm.lora's chat-formatting path produces our format.
 4. **Scoring (server only).** A `/v1/completions` request carrying `"lab_score": "<text>"` doesn't generate anything. It returns, for each token of that text, the probability the model gave it after the request's `prompt`, its rank, the model's top 5 guesses, and the probability that the document ends right after the text. The model reads the document in 256-token chunks, carrying its cache forward, so memory stays small; prompt plus text can be up to 4,096 tokens. The request goes through the server's own queue (a seed marks it as not batchable, which routes it to the single-request path on the generation thread). So it waits for any generation in progress and loads the requested model and add-on exactly as a normal request would.
+5. **Saving preference pairs (server only).** `POST /lab/preference` appends a pair from Compare mode to `prefs/pairs.jsonl`, after checking it has a prompt and two different replies. `GET /lab/preference` returns how many pairs are saved. These are new routes on the server's own handler, not changes to existing ones.
 
 One related quirk: stop strings that begin with a newline (such as `"\nUser:"`) didn't fire reliably with mlx_lm.server, so the playground's starters use `User:` and `Q:` instead.
 
-These patches reach into mlx-lm internals (`TokenizerWrapper`, `BPEStreamingDetokenizer`, `SPMStreamingDetokenizer`, and for scoring `ResponseGenerator._serve_single` and `APIHandler.handle_completion`), so an mlx-lm upgrade could break them. They were written and tested against mlx-lm 0.32.2. After an upgrade, check the server's startup messages, then try one continuation and one Show surprise.
+These patches reach into mlx-lm internals (`TokenizerWrapper`, `BPEStreamingDetokenizer`, `SPMStreamingDetokenizer`, for scoring `ResponseGenerator._serve_single` and `APIHandler.handle_completion`, and for pairs `APIHandler.do_POST` and `do_GET`), so an mlx-lm upgrade could break them. They were written and tested against mlx-lm 0.32.2. After an upgrade, check the server's startup messages, then try one continuation and one Show surprise.
 
 ## Testing changes without the Mac
 
-MLX also runs on Linux, on the CPU (`pip install "mlx[cpu]" mlx-lm==0.32.2`). A tiny, randomly initialized llama model (from `mlx_lm.models.llama`), with a small byte-level BPE tokenizer trained on `data/` and saved with transformers, is enough to run `server_launcher.py` or `lab_launcher.py` for real. That's how the scoring patch and the multi-turn masking were checked. The outputs are nonsense, but the mechanics are the real ones.
+MLX also runs on Linux, on the CPU (`pip install "mlx[cpu]" mlx-lm==0.32.2`). A tiny, randomly initialized llama model (from `mlx_lm.models.llama`), with a small byte-level BPE tokenizer trained on `data/` and saved with transformers, is enough to run `server_launcher.py` or `lab_launcher.py` for real. That's how the scoring patch, the multi-turn masking, Compare mode and DPO training were checked. The outputs are nonsense, but the mechanics are the real ones.

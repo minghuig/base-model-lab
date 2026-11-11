@@ -79,7 +79,7 @@ cat <<'GUIDE'
 Starting training. What to watch:
   - Every 10 updates it prints "Train loss": how surprised the model is by the
     replies it's training on. It should fall quickly at first, then level off.
-  - Every 25 updates it prints "Val loss": the same score on the 42 held-out
+  - Every 25 updates it prints "Val loss": the same score on the held-out
     conversations it never trains on. This is the honest one.
   - If Val loss starts rising while Train loss keeps falling, the model has
     started memorizing its examples. A snapshot is saved every 25 updates, so

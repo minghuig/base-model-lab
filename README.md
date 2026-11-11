@@ -5,6 +5,7 @@ Hands-on experiments with language models on a 16 GB Apple silicon MacBook Pro: 
 - **A playground** (`base-model-playground.html`). Write the start of a document and a base model continues it. It works with a server on this Mac, OpenRouter or Featherless. With the local server, **Show surprise** colors each token by how unlikely the model found it.
 - **A local server** (`start-base-model.sh`). It runs Mistral Nemo 12B base and Llama 3.1 8B base with mlx-lm, with or without a trained add-on.
 - **A fine-tune** (`train.sh`). A LoRA add-on teaches Llama 3.1 8B base to answer as an assistant that writes plainly and well, trained on 438 conversations written for this.
+- **Preference tuning** (`dpo.sh`). The playground's **Compare** mode writes two replies; you pick the better one, and DPO trains the add-on toward your picks.
 
 ## Quick start
 
@@ -30,6 +31,14 @@ Assistant:
 
 To use a snapshot from partway through a run instead, turn it into an add-on with `pick_checkpoint.sh`. For example, `pick_checkpoint.sh 150` takes update 150 of the current run, and `pick_checkpoint.sh 100 prose` takes update 100 of the run in `adapters/prose`.
 
+To tune an add-on with your own preferences, pick it in the playground, press **Compare**, and choose the better of two replies, 100 to 200 times. Then stop the server and run:
+
+```
+bash ~/Documents/base-model-lab/dpo.sh
+```
+
+It trains `adapters/prose-v3-dpo` from `prose-v3`; `dpo.yaml` sets which add-on it starts from.
+
 ## Files
 
 | Path | What it is |
@@ -37,6 +46,8 @@ To use a snapshot from partway through a run instead, turn it into an add-on wit
 | `base-model-playground.html` | The playground: one HTML file, no build step. API keys stay in the browser. |
 | `start-base-model.sh`, `server_launcher.py` | Install, download, and start `mlx_lm.server` with the lab's fixes and scoring. |
 | `train.sh`, `lab_launcher.py`, `config.yaml` | Train an add-on with `mlx_lm.lora`, in the lab's chat format. |
+| `dpo.sh`, `dpo_train.py`, `dpo.yaml` | Preference tuning (DPO) from the pairs picked in Compare mode. |
+| `prefs/` | `prompts.js`, the prompts Compare mode uses, and `pairs.jsonl`, your picks. |
 | `pick_checkpoint.sh`, `list_adapters.sh` | Turn a snapshot into an add-on, and keep the playground's add-on menu up to date. |
 | `dataset_src/` | The conversations in batches by category, and `build_dataset.py`, which checks them and writes `data/`. |
 | `data/` | The generated training and held-out sets. Don't edit them by hand. |
@@ -47,7 +58,7 @@ Trained add-ons go in `adapters/`, which is git-ignored.
 
 ## More
 
-- [How it works](docs/how-it-works.md): the training format, the dataset, training settings, the surprise view, and the fixes on top of mlx-lm.
+- [How it works](docs/how-it-works.md): the training format, the dataset, training settings, the surprise view, preference tuning, and the fixes on top of mlx-lm.
 - [Training runs](runs/README.md): each run's settings, results, and what playing with it showed.
 - [Ideas](docs/ideas.md): what to try next.
 

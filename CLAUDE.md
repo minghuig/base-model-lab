@@ -25,6 +25,10 @@ Start with README.md for the overview. Then:
   the lr_schedule's "auto" decay steps; don't set iters by hand.
   pick_checkpoint.sh and list_adapters.sh keep the playground's add-on menu
   in sync.
+- prefs/pairs.jsonl is Ming's own picks from Compare mode, written by the
+  server. Never regenerate, rewrite or reorder it. dpo.sh trains from it; give
+  each DPO run its own adapter_path in dpo.yaml, and record it in
+  runs/README.md the same way as SFT runs (dpo-log.txt is its log).
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.
 - The launchers (server_launcher.py, lab_launcher.py) patch mlx-lm internals,

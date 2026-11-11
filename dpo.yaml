@@ -1,0 +1,16 @@
+# Preference tuning (DPO) settings. dpo.sh reads this; dpo_train.py explains
+# how the training works.
+model: mlx-community/Meta-Llama-3.1-8B-4bit
+start_adapter: adapters/prose-v3      # the add-on to start from; it's also the reference
+adapter_path: adapters/prose-v3-dpo   # where the new add-on goes
+pairs: prefs/pairs.jsonl              # your picks from the playground's Compare mode
+
+beta: 0.1                   # the leash: how much a reply's score has to change to count.
+                            # Lower lets the model move further from the start.
+learning_rate: 1e-5         # step size; a quarter of SFT's, since the pairs are few
+epochs: 2                   # passes over the pairs; each pass also saves epochN_adapters.safetensors
+pairs_per_update: 4         # pairs averaged into each nudge
+valid_fraction: 0.1         # share of pairs held out to check against (with 10 or more)
+max_seq_length: 1024        # longer prompt + reply are cut to this many tokens
+grad_checkpoint: true       # saves memory at some cost in speed
+seed: 0

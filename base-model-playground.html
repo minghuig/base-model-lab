@@ -200,6 +200,17 @@
   .sample-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
   .status { font-size: 12.5px; color: var(--muted); margin-right: auto; }
 
+  /* Compare view */
+  .c-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+  .c-bar select { font: inherit; }
+  .c-prompt { margin: 0 0 18px; font: 15px/1.6 var(--mono); white-space: pre-wrap; color: var(--graphite); }
+  .sample.c-card { border-left-color: var(--rule); }
+  .sample.c-card.picked { border-left-color: var(--ink); }
+  .c-label { font: 600 13px var(--sans); margin: 0 0 4px; color: var(--graphite); }
+  .c-choice { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 8px; }
+  .c-note { font-size: 12.5px; color: var(--muted); margin: 0 0 18px; }
+  .c-saved { font-size: 13px; color: var(--graphite); }
+
   /* Surprise view */
   .s-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 18px; font-size: 12.5px; color: var(--muted); }
   .s-legend i { display: inline-block; width: 14px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 5px; border: 1px solid var(--rule); }
@@ -304,6 +315,7 @@
           <button class="primary" id="go" type="button">Continue<span class="kbd" id="kbd"></span></button>
           <button id="stop" type="button" disabled>Stop</button>
           <button id="surprise" type="button" title="Color each token of the selected text, or the whole document, by how unlikely the model found it">Show surprise</button>
+          <button id="compare" type="button" title="Two replies side by side; pick the better one to collect training pairs">Compare</button>
         </div>
         <div class="field">
           <label class="lbl" for="temp">Temperature</label>
@@ -322,6 +334,7 @@
           <input id="stops" type="text" spellcheck="false" placeholder="e.g. User:">
         </div>
       </div>
+      <p class="note" id="compareNote" hidden><strong>Compare</strong> writes two replies with the current model and add-on, and you pick the better one. Each pick is saved to <code>prefs/pairs.jsonl</code> in the lab folder, where <code>dpo.sh</code> trains from it. Keys: 1 or 2 to pick, S to skip.</p>
       <p class="note" id="surpriseNote" hidden><strong>Show surprise</strong> colors each token by how unlikely the model found it, given everything before it. With nothing selected, it scores the model-written text in the document and shows yours in gray for context, the way training only scores the reply. Select some text to score exactly that instead. With a trained add-on picked, it shows the model with and without it.</p>
       <p class="note">“Stop at” takes up to four strings, separated by commas; write a newline as <code>\n</code>. Your key goes straight from this page to the provider you picked and nowhere else.</p>
     </section>
@@ -430,6 +443,8 @@
   const tempEl = $('#temp'), tempOut = $('#tempOut'), maxEl = $('#max'), nEl = $('#n'), stopEl = $('#stops');
   const goBtn = $('#go'), stopBtn = $('#stop'), samplesBox = $('#samples'), emptyEl = $('#empty'), wsHint = $('#wsHint');
   const surpriseBtn = $('#surprise'), surpriseNote = $('#surpriseNote'), panelTitle = $('#panelTitle'), samplesSub = $('#samplesSub');
+  const compareBtn = $('#compare'), compareNote = $('#compareNote');
+  const compare = { active: false, cards: null, prompt: null, source: 'list', saving: false, choose: null };
 
   // ---------- storage (best effort) ----------
   const store = {
@@ -655,6 +670,9 @@
       ? 'Color each token of the selected text, or the whole document, by how unlikely the model found it'
       : 'Works with the server on this Mac';
     surpriseNote.hidden = p !== 'local';
+    compareBtn.disabled = p !== 'local';
+    compareBtn.title = p === 'local' ? 'Two replies side by side; pick the better one to collect training pairs' : 'Works with the server on this Mac';
+    compareNote.hidden = p !== 'local';
     keyLabel.textContent = cfg.name + ' API key';
     keyLink.href = cfg.keyLink || '#';
     keyEl.placeholder = p === 'openrouter' ? 'sk-or-…' : 'Paste your key';
@@ -1044,9 +1062,16 @@
     goBtn.disabled = on;
     stopBtn.disabled = !on;
     surpriseBtn.disabled = on || providerEl.value !== 'local';
+    compareBtn.disabled = on || providerEl.value !== 'local';
   }
 
   function showPanel(kind) {
+    compare.active = kind === 'compare';
+    if (kind === 'compare') {
+      panelTitle.textContent = 'Compare';
+      samplesSub.textContent = 'Two replies to the same prompt from the same model. Pick the one you like better; your picks become training pairs.';
+      return;
+    }
     if (kind === 'surprise') {
       panelTitle.textContent = 'Surprise';
       samplesSub.textContent = 'How unlikely the model found each token, given everything before it. Point at a token to see what it expected instead; click to keep it selected.';
@@ -1336,6 +1361,188 @@
   }
 
   surpriseBtn.addEventListener('click', runSurprise);
+
+  // ---------- compare view ----------
+  // Writes two replies to one prompt with the current model and add-on, and
+  // sends the pick to the lab's server, which appends it to prefs/pairs.jsonl.
+  // Prompts come from prefs/prompts.js (loaded like the add-on list) or from
+  // the document.
+  let comparePrompts = [];
+  function loadComparePrompts() {
+    const el = document.createElement('script');
+    el.src = 'prefs/prompts.js?t=' + Date.now();
+    // An entry is a question, or a conversation: [user, assistant, user, ...],
+    // ending with the user turn the two replies answer.
+    const ok = (x) => (typeof x === 'string' && x.trim()) ||
+      (Array.isArray(x) && x.length % 2 === 1 && x.every((t) => typeof t === 'string' && t.trim()));
+    el.onload = () => { comparePrompts = Array.isArray(window.BMP_PROMPTS) ? window.BMP_PROMPTS.filter(ok) : []; };
+    el.onerror = () => {};
+    document.head.appendChild(el);
+  }
+  loadComparePrompts();
+
+  function localBase() {
+    const cfg = PROVIDERS.local;
+    return (baseUrlEl.value.trim() || cfg.defaultBase).replace(/\/+$/, '');
+  }
+  function serverRoot() { return localBase().replace(/\/v1$/, ''); }
+
+  async function refreshPairCount(el) {
+    try {
+      const j = await fetch(serverRoot() + '/lab/preference').then((r) => r.json());
+      if (typeof j.count === 'number') el.textContent = j.count + (j.count === 1 ? ' pair' : ' pairs') + ' saved';
+    } catch (e) {
+      el.textContent = '';
+    }
+  }
+
+  // The training format: "User: …\n\nAssistant: …\n\nUser: …\n\nAssistant:"
+  function listPromptText(entry) {
+    const turns = Array.isArray(entry) ? entry : [entry];
+    return turns.map((t, i) => (i % 2 ? 'Assistant: ' : 'User: ') + t.trim()).join('\n\n') + '\n\nAssistant:';
+  }
+
+  function nextListPrompt(advance) {
+    if (!comparePrompts.length) return null;
+    let i = store.get('compare.next', 0);
+    if (advance) i += 1;
+    i = ((i % comparePrompts.length) + comparePrompts.length) % comparePrompts.length;
+    store.set('compare.next', i);
+    return { index: i, text: comparePrompts[i] };
+  }
+
+  async function runCompare(advance) {
+    if (providerEl.value !== 'local') return;
+    const cfg = PROVIDERS.local;
+    const model = currentModel();
+    const adapter = currentAdapter();
+    if (adapter && !model) { keyMsg.textContent = 'Pick the model this add-on was trained on.'; focusModel(); return; }
+    keyMsg.textContent = '';
+    const source = compare.source;
+    let prompt, label;
+    if (source === 'list') {
+      const item = nextListPrompt(advance);
+      if (!item) { compare.source = 'document'; return runCompare(false); }
+      prompt = listPromptText(item.text);
+      label = 'Prompt ' + (item.index + 1) + ' of ' + comparePrompts.length;
+    } else {
+      prompt = ta.value;
+      label = 'The document';
+      if (!prompt.trim()) { ta.focus(); return; }
+    }
+    saveSettings();
+    if (controller) controller.abort();
+    const ctl = new AbortController();
+    controller = ctl;
+    batch = null;
+    samplesBox.textContent = '';
+    emptyEl.hidden = true;
+    showPanel('compare');
+    setRunning(true);
+
+    const bar = document.createElement('div'); bar.className = 'c-bar';
+    const pick = document.createElement('select');
+    pick.setAttribute('aria-label', 'Where prompts come from');
+    for (const [v, t] of [['list', 'Prompts from the list'], ['document', 'Prompt: this document']]) {
+      const op = document.createElement('option'); op.value = v; op.textContent = t; pick.appendChild(op);
+    }
+    if (!comparePrompts.length) pick.options[0].disabled = true;
+    pick.value = source;
+    pick.addEventListener('change', () => { compare.source = pick.value; pick.blur(); runCompare(false); });
+    const where = document.createElement('span'); where.textContent = label;
+    const count = document.createElement('span'); count.className = 'c-saved';
+    bar.append(pick, where, count);
+    refreshPairCount(count);
+
+    const shown = document.createElement('p'); shown.className = 'c-prompt';
+    shown.textContent = source === 'list' ? prompt : tail(prompt, 300);
+
+    samplesBox.append(bar, shown);
+    const b = { prompt, stops: [], cards: [] };
+    const o = { cfg, provider: 'local', base: localBase(), key: '', model, adapter, prompt,
+                temp: parseFloat(tempEl.value), max: parseInt(maxEl.value, 10) || 200, stops: [] };
+    const cards = ['A', 'B'].map((name) => {
+      const lab = document.createElement('p'); lab.className = 'c-label'; lab.textContent = name;
+      samplesBox.appendChild(lab);
+      const card = makeCard(b);
+      card.el.classList.add('c-card');
+      card.pre.querySelector('.ctx').remove();
+      card.appendBtn.remove();
+      return card;
+    });
+    const choice = document.createElement('div'); choice.className = 'c-choice';
+    const btnA = document.createElement('button'); btnA.type = 'button'; btnA.textContent = 'A is better';
+    const btnB = document.createElement('button'); btnB.type = 'button'; btnB.textContent = 'B is better';
+    const btnSkip = document.createElement('button'); btnSkip.type = 'button'; btnSkip.className = 'small'; btnSkip.textContent = 'Skip';
+    const btnAgain = document.createElement('button'); btnAgain.type = 'button'; btnAgain.className = 'small'; btnAgain.textContent = 'New pair';
+    const msg = document.createElement('span'); msg.className = 'status';
+    choice.append(btnA, btnB, btnSkip, btnAgain, msg);
+    const note = document.createElement('p'); note.className = 'c-note';
+    note.textContent = 'Skip when they’re about equal or both bad: training only learns from a clear preference.';
+    samplesBox.append(choice, note);
+    for (const x of [btnA, btnB]) x.disabled = true;
+
+    compare.cards = cards;
+    compare.prompt = prompt;
+    compare.choose = async (which) => {
+      if (compare.saving || btnA.disabled) return;
+      if (which === 'skip') return runCompare(source === 'list');
+      const [win, lose] = which === 'A' ? [cards[0], cards[1]] : [cards[1], cards[0]];
+      compare.saving = true;
+      for (const x of [btnA, btnB, btnSkip, btnAgain]) x.disabled = true;
+      win.el.classList.add('picked');
+      msg.textContent = 'Saving…';
+      try {
+        const res = await fetch(serverRoot() + '/lab/preference', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt, source, choice: which, model: model || null, adapter: adapter || null,
+            temperature: o.temp, max_tokens: o.max,
+            chosen: { text: win.text, finish: win.finish },
+            rejected: { text: lose.text, finish: lose.finish },
+          }),
+        });
+        let j = null;
+        try { j = await res.json(); } catch (e) {}
+        if (!res.ok || !j || !j.saved) {
+          throw new Error(res.status === 404
+            ? 'This server can’t save pairs yet. Stop it with Control-C and start it again with bash ~/Documents/base-model-lab/start-base-model.sh.'
+            : (j && j.error) || ('The server answered ' + res.status + '.'));
+        }
+        msg.textContent = 'Saved. ' + j.count + (j.count === 1 ? ' pair' : ' pairs') + ' so far.';
+        compare.saving = false;
+        setTimeout(() => { if (compare.active && compare.cards === cards) runCompare(source === 'list'); }, 700);
+      } catch (e) {
+        compare.saving = false;
+        win.el.classList.remove('picked');
+        msg.textContent = e.message;
+        for (const x of [btnA, btnB, btnSkip, btnAgain]) x.disabled = false;
+      }
+    };
+    btnA.addEventListener('click', () => compare.choose('A'));
+    btnB.addEventListener('click', () => compare.choose('B'));
+    btnSkip.addEventListener('click', () => compare.choose('skip'));
+    btnAgain.addEventListener('click', () => runCompare(false));
+
+    cards.forEach(startCard);
+    await Promise.allSettled(cards.map((c) => runOne(c, o, ctl.signal)));
+    if (controller === ctl) setRunning(false);
+    const ok = cards.every((c) => c.state === 'done' && c.text.trim());
+    const same = ok && cards[0].text === cards[1].text;
+    btnA.disabled = btnB.disabled = !ok || same;
+    if (same) msg.textContent = 'The two replies are identical. Try New pair, or raise the temperature.';
+    else if (!ok && cards.some((c) => c.state === 'done' && !c.text.trim())) msg.textContent = 'One reply is empty. Try New pair.';
+  }
+
+  compareBtn.addEventListener('click', () => runCompare(false));
+  document.addEventListener('keydown', (e) => {
+    if (!compare.active || !compare.choose || e.metaKey || e.ctrlKey || e.altKey) return;
+    const t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+    if (e.key === '1') compare.choose('A');
+    else if (e.key === '2') compare.choose('B');
+    else if (e.key === 's' || e.key === 'S') compare.choose('skip');
+  });
   goBtn.addEventListener('click', go);
   stopBtn.addEventListener('click', () => { if (controller) controller.abort(); });
   document.addEventListener('keydown', (e) => {

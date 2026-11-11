@@ -19,6 +19,10 @@
    average of minus the log of these probabilities), and it's what the
    playground's "Show surprise" button draws.
 
+4. Save preference pairs. The playground's Compare mode posts each judgment to
+   /lab/preference, which appends it to prefs/pairs.jsonl in this folder for
+   dpo.sh to train from.
+
 Each fix prints a line in parentheses if it can't be applied, and the server
 still starts. These patches reach into mlx-lm internals (written against
 mlx-lm 0.32), so an upgrade could break them.
@@ -250,6 +254,74 @@ try:
     srv.APIHandler.handle_completion = _handle_completion_or_score
 except Exception as e:
     print(f"(Couldn't add the surprise view to the server: {e})")
+
+# 4. Preference pairs. The playground's Compare mode sends each judgment here:
+#   POST /lab/preference   {"prompt", "chosen", "rejected", ...}
+# appends it as one line to prefs/pairs.jsonl in the lab folder, where
+# dpo.sh trains from it. GET /lab/preference returns how many are saved.
+try:
+    import datetime
+    import json
+    import os
+    import threading
+
+    import mlx_lm.server as srv
+
+    PREFS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "prefs", "pairs.jsonl")
+    _prefs_lock = threading.Lock()
+
+    def _count_pairs():
+        try:
+            with open(PREFS) as f:
+                return sum(1 for line in f if line.strip())
+        except FileNotFoundError:
+            return 0
+
+    def _reply(handler, status, body):
+        handler._set_completion_headers(status)
+        handler.end_headers()
+        handler.wfile.write(json.dumps(body).encode())
+
+    def _valid_reply(r):
+        return isinstance(r, dict) and isinstance(r.get("text"), str) and r["text"].strip()
+
+    def _save_preference(handler):
+        try:
+            length = int(handler.headers.get("Content-Length", 0))
+            pair = json.loads(handler.rfile.read(length) or b"{}")
+            if not isinstance(pair.get("prompt"), str) or not pair["prompt"]:
+                raise ValueError("a pair needs the prompt")
+            if not (_valid_reply(pair.get("chosen")) and _valid_reply(pair.get("rejected"))):
+                raise ValueError("a pair needs a chosen and a rejected reply, each with text")
+            if pair["chosen"]["text"] == pair["rejected"]["text"]:
+                raise ValueError("the two replies are identical")
+            pair["saved_at"] = datetime.datetime.now().isoformat(timespec="seconds")
+            with _prefs_lock:
+                os.makedirs(os.path.dirname(PREFS), exist_ok=True)
+                with open(PREFS, "a") as f:
+                    f.write(json.dumps(pair, ensure_ascii=False) + "\n")
+                count = _count_pairs()
+            _reply(handler, 200, {"saved": True, "count": count})
+        except Exception as e:
+            _reply(handler, 400, {"error": f"Couldn't save the pair: {e}"})
+
+    _do_post = srv.APIHandler.do_POST
+    _do_get = srv.APIHandler.do_GET
+
+    def _do_post_lab(self):
+        if self.path.split("?")[0] == "/lab/preference":
+            return _save_preference(self)
+        return _do_post(self)
+
+    def _do_get_lab(self):
+        if self.path.split("?")[0] == "/lab/preference":
+            return _reply(self, 200, {"count": _count_pairs(), "file": PREFS})
+        return _do_get(self)
+
+    srv.APIHandler.do_POST = _do_post_lab
+    srv.APIHandler.do_GET = _do_get_lab
+except Exception as e:
+    print(f"(Couldn't add preference saving to the server: {e})")
 
 from mlx_lm.server import main
 
