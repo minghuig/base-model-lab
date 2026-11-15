@@ -71,12 +71,14 @@ def read_config(path):
         "max_seq_length": 1024,
         "seed": 0,
         "grad_checkpoint": True,
+        "only_start_pairs": True,
+        "min_pairs": 20,
     }
     for k, v in defaults.items():
         cfg.setdefault(k, v)
     for k in ("model", "start_adapter", "adapter_path", "pairs"):
         if not cfg.get(k):
-            raise SystemExit(f"dpo.yaml needs a value for {k}.")
+            raise SystemExit(f"{os.path.basename(path)} needs a value for {k}.")
     return cfg
 
 
@@ -135,7 +137,10 @@ def reply_logprob(model, ids, start):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=os.path.join(HERE, "dpo.yaml"))
-    cfg = read_config(ap.parse_args().config)
+    ap.add_argument("--check-pairs", action="store_true",
+                    help="only check there are enough usable pairs, then exit (dpo.sh runs this first)")
+    args = ap.parse_args()
+    cfg = read_config(args.config)
     random.seed(cfg["seed"])
     mx.random.seed(cfg["seed"])
 
@@ -147,20 +152,35 @@ def main():
     start_dir = lab_path(cfg["start_adapter"])
     out_dir = lab_path(cfg["adapter_path"])
 
-    # DPO measures change from the starting add-on, so the cleanest signal comes
-    # from pairs that add-on wrote. Others still work; say how many there are.
+    # DPO measures change from the starting add-on, so the signal comes from
+    # pairs that add-on wrote. prefs/pairs.jsonl holds picks for every model and
+    # add-on, so by default keep only the starting add-on's own.
     def short(x):
         return os.path.basename(str(x).rstrip("/")) if x else "no add-on"
     want = (short(cfg["model"]), short(start_dir))
     other = {}
+    mine = []
     for p in pairs:
         got = (short(p.get("model")), short(p.get("adapter")))
-        if got != want:
+        if got == want:
+            mine.append(p)
+        else:
             other[got] = other.get(got, 0) + 1
     if other:
         listed = ", ".join(f"{n} from {m} + {a}" for (m, a), n in sorted(other.items(), key=lambda kv: -kv[1]))
-        print(f"Note: {sum(other.values())} of {len(pairs)} pairs were written by something other than "
-              f"{want[0]} + {want[1]} ({listed}). They still count, but pairs the starting add-on wrote teach it most directly.")
+        if cfg["only_start_pairs"]:
+            if not args.check_pairs:
+                print(f"Using the {len(mine)} pairs written by {want[0]} + {want[1]}; skipping {sum(other.values())} from others ({listed}).")
+            pairs = mine
+        elif not args.check_pairs:
+            print(f"Note: {sum(other.values())} of {len(pairs)} pairs were written by something other than "
+                  f"{want[0]} + {want[1]} ({listed}). They still count, but pairs the starting add-on wrote teach it most directly.")
+    if len(pairs) < cfg["min_pairs"]:
+        raise SystemExit(f"There are only {len(pairs)} pairs to train on. Training on fewer than about {cfg['min_pairs']} mostly teaches "
+                         f"the model those exact replies. Collect more with the playground's Compare button, "
+                         f"with {want[0]} and the {want[1]} add-on selected.")
+    if args.check_pairs:
+        return
     with open(os.path.join(start_dir, "adapter_config.json")) as f:
         adapter_cfg = json.load(f)
 
@@ -168,7 +188,15 @@ def main():
     model, tokenizer = load(cfg["model"])
     model.freeze()
     linear_to_lora_layers(model, adapter_cfg["num_layers"], adapter_cfg["lora_parameters"])
-    model.load_weights(os.path.join(start_dir, "adapters.safetensors"), strict=False)
+    # load_weights(strict=False) silently skips weights it has no place for, so
+    # check that every saved weight found a home (say, the same layer count).
+    saved = mx.load(os.path.join(start_dir, "adapters.safetensors"))
+    have = set(k for k, _ in tree_flatten(model.parameters()))
+    missing = [k for k in saved if k not in have]
+    if missing:
+        raise SystemExit(f"{len(missing)} of the starting add-on's weights don't fit this model (for example {missing[0]}). "
+                         f"Check that model in the settings matches the add-on.")
+    model.load_weights(list(saved.items()), strict=False)
     if cfg["grad_checkpoint"]:
         grad_checkpoint(model.layers[0])
 
@@ -187,11 +215,13 @@ def main():
     print("Scoring every reply with the starting add-on (the reference)…")
     t0 = time.time()
     model.eval()
-    for ex in examples:
+    for n, ex in enumerate(examples, 1):
         rc = reply_logprob(model, *ex["chosen"])
         rr = reply_logprob(model, *ex["rejected"])
         mx.eval(rc, rr)
         ex["ref"] = (rc.item(), rr.item())
+        if n % 10 == 0 and n < len(examples):
+            print(f"  scored {n} of {len(examples)} pairs ({time.time() - t0:.0f}s)")
     print(f"Done in {time.time() - t0:.0f}s.")
     clear = getattr(mx, "clear_cache", None) or getattr(getattr(mx, "metal", None), "clear_cache", None)
     if clear:

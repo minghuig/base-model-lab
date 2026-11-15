@@ -3,7 +3,8 @@
 model: mlx-community/Meta-Llama-3.1-8B-4bit
 start_adapter: adapters/prose-v3      # the add-on to start from; it's also the reference
 adapter_path: adapters/prose-v3-dpo   # where the new add-on goes
-pairs: prefs/pairs.jsonl              # your picks from the playground's Compare mode
+pairs: prefs/pairs.jsonl              # your picks from the playground's Compare mode, all models together
+only_start_pairs: true                # use only pairs the starting add-on wrote
 
 beta: 0.1                   # the leash: how much a reply's score has to change to count.
                             # Lower lets the model move further from the start.

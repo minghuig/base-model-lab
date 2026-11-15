@@ -24,6 +24,9 @@ Start with README.md for the overview. Then:
   tokens) died at update 1. train.sh and dpo.sh set
   AGX_RELAX_CDM_CTXSTORE_TIMEOUT=1 and run under caffeinate -is; the sure fix
   is plugged in with the lid closed. Keep that in any new training script.
+- On 2026-11-14 Ming had the unused snapshots of runs 1-5 and DPO run 1
+  deleted (numbered 00000NN_ and epochN_ files); each adapters/ folder keeps
+  only its final adapters.safetensors. Held-out curves are in runs/*-log.txt.
 - Give each training run its own adapter_path in config.yaml (adapters/prose,
   adapters/prose-v2, ...), or in config-nemo.yaml for Nemo runs
   (train.sh --config config-nemo.yaml). Run length is set by "epochs" (or
@@ -32,8 +35,9 @@ Start with README.md for the overview. Then:
   pick_checkpoint.sh and list_adapters.sh keep the playground's add-on menu
   in sync.
 - prefs/pairs.jsonl is Ming's own picks from Compare mode, written by the
-  server. Never regenerate, rewrite or reorder it. dpo.sh trains from it; give
-  each DPO run its own adapter_path in dpo.yaml, and record it in
+  server. Never regenerate, rewrite or reorder it. dpo.sh trains from it
+  (only the pairs the starting add-on wrote); give each DPO run its own
+  adapter_path in dpo.yaml or dpo-nemo.yaml, and record it in
   runs/README.md the same way as SFT runs (dpo-log.txt is its log).
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.

@@ -101,3 +101,127 @@ What it means: the steps were far too big. A score is a log-probability summed o
 It kept moving after the loss reached about 0 because of Adam. The loss flattens out as the margin grows, so its gradient shrinks. But Adam divides each step by the recent size of the gradient, so a tiny gradient that keeps pointing the same way still gets a full-size step. The learning rate and the number of updates are what limit how far it goes, not the loss. The settings came from treating DPO like SFT. For SFT, the 2e-5 to 4e-5 range worked. But pushing a reply down has no floor: its log-probability can keep falling. Common DPO settings are far smaller.
 
 `prose-v3-dpo-epoch1` is the epoch-1 snapshot as an add-on. `dpo.yaml` now uses 5e-6 for 1 epoch, about a quarter of epoch 1's movement. The goal for a rerun: training loss well above 0 at the end, and held-out chosen scores that barely move.
+
+## Run 4, 2026-11-11: `adapters/nemo-prose`
+
+Run 3's recipe on Mistral Nemo 12B base instead of Llama 3.1 8B: the same 438 conversations and held-out set, one pass of 197 updates, the same schedule and LoRA settings (`config-nemo.yaml`). Only the model differs, so a difference from `prose-v3` comes from the base model. The add-on corrects the last 16 of Nemo's 40 layers: 11.4M trainable numbers, 0.09% of the model. It took about 21 minutes, at about 45 tokens a second against Llama's 62. Log: [2026-11-11-nemo-prose-197-log.txt](2026-11-11-nemo-prose-197-log.txt).
+
+| Update | start | 25 | 50 | 75 | 100 | 125 | 150 | 175 | **197** |
+|---|---|---|---|---|---|---|---|---|---|
+| Held-out loss | 2.186 | 1.929 | 1.880 | 1.855 | 1.841 | 1.820 | 1.815 | 1.809 | **1.808** |
+
+What it means: held-out loss flattened, and the final add-on is the best snapshot. The flat end alone doesn't prove the model was done, since the learning rate is close to zero by then (6e-6 at update 150, 1e-7 at 197). But the gains were already shrinking while the steps were still large: 0.049 from update 25 to 50, then 0.025, then 0.014 by update 100, at about 2e-5. Training loss stayed close to held-out loss all run, so it wasn't memorizing within the pass. Runs 1 and 2 showed what a second pass does: held-out loss jumps as soon as the examples repeat. So one pass stays.
+
+The two models split the same text into almost the same number of tokens (38.0k for Nemo and 37.5k for Llama by update 190), so their per-token losses are roughly comparable. Untrained Nemo predicts the held-out replies much better than untrained Llama (2.186 against 2.465). After training they finish close together (1.808 against 1.825). Most of what training teaches is the voice, and both models learn it about equally well. Whatever the bigger model adds has to show up in what the replies say, which loss on this data barely measures. Run 1 already showed that loss isn't a judge of quality.
+
+### Probe comparison: `prose-v3` (Llama) vs `nemo-prose` (Nemo), 2026-11-12
+
+18 prompts that aren't in the training data, each sampled 3 times from both add-ons at temperature 0.7, with up to 300 tokens and no stop string. Two of them were conversations where the reply answers a follow-up. The judgments are Claude's. Three samples per prompt is small, so only the big differences mean much.
+
+| | `prose-v3` | `nemo-prose` |
+|---|---|---|
+| Ended on its own (no made-up `User:` turn in either) | 51 of 54 | 52 of 54 |
+| Median reply length | 45 tokens | 71 tokens |
+| Didn't answer as the assistant: a joke or dialogue instead, another speaker's lines, a non sequitur | 1 of 54 | 15 of 54 |
+| Factual answers mostly right (northern lights, sea turtles, sailors before GPS, "so is a jackrabbit a rabbit") | 3 of 12 | 7 of 12 |
+| Corrected a wrong premise (bulls and red, horned Viking helmets) | 0 of 6 | 1 of 6, and 4 of the 6 were jokes instead |
+| Ocean smell described well, without a disclaimer or a wrong fact | 1 of 3 | 3 of 3 |
+| "ugh i said something dumb in a meeting…" answered on topic | 3 of 3 (short, a bit glib) | 0 of 3 |
+| Personal questions (bears, morning person, last laugh) answered with an invented human life | 3 of 9 | 5 of 9 |
+
+What it showed:
+
+- **Nemo knows more.** When it answers, it's right more often, and in more detail. It explained sea turtles' magnetic imprinting, and it knew a jackrabbit is a hare, which Llama got wrong 3 of 3 times even after being told how hares differ. Its index-fund answers were all solid, and its cat-to-dog letters were funnier and more in character.
+- **Nemo holds the assistant role much less firmly.** "Why do bulls get angry when they see red" got three jokes, one of them a dialogue with a "Farmer:" and an "Assistant:". The pigeon-bakery story got continued as if it were already underway. The bike follow-up got a bike-shop employee ("bring it in and we'll fix it"). All three replies to "I said something dumb in a meeting" ignored it: one was about the user's son singing the anthem, another about the 2008 recession. Llama's replies are less informed, but they almost always stay in the shape of an assistant answering.
+- **Its made-up facts are more specific.** Llama's errors were vague ("grizzlies travel in packs"). Nemo invented a 1906 "GPS" system built by Hermann Anschütz, a real person who built a gyrocompass, and had the liners Bremen and Kaiser Wilhelm der Große sink within weeks. Fluent, specific errors are harder to catch.
+- **Neither handles personal questions or the bike follow-up well.** Neither found the real bike fix, which is the derailleur's low-limit screw. Repetition loops showed up in both, two or three times each.
+
+Why Nemo might hold the role less firmly, all untested: the add-on corrects a smaller share of Nemo (16 of 40 layers, against 16 of 32), so more of the model runs unchanged. Training also moved Nemo less (held-out loss fell 0.38, against Llama's 0.64), so its base habits, like recognizing a "why did the X…" joke setup, stay closer to the surface. The cleanest test is to retrain Nemo with `num_layers: 20` (half its layers, like Llama) and rerun these prompts.
+
+## Run 5, 2026-11-12: `adapters/nemo-prose-20layers`
+
+Run 4 with one change: corrections on the last 20 of Nemo's 40 layers instead of 16. That's half the model, the same share as Llama's 16 of 32, and 14.3M trainable numbers instead of 11.4M. The question it tests is whether the small share is why `nemo-prose` drifts out of the assistant role. Both runs used the same seed, so they saw the same conversations in the same order. It took about 22 minutes, at about 40 tokens a second against run 4's 45. Log: [2026-11-12-nemo-prose-20layers-197-log.txt](2026-11-12-nemo-prose-20layers-197-log.txt). (Trained as `nemo-prose-l20` and renamed afterward, because the lowercase L read as a 1.)
+
+| Update | start | 25 | 50 | 75 | 100 | 125 | 150 | 175 | **197** |
+|---|---|---|---|---|---|---|---|---|---|
+| Held-out loss, run 5 (20 layers) | 2.186 | 1.896 | 1.842 | 1.811 | 1.785 | 1.771 | 1.759 | 1.753 | **1.751** |
+| Held-out loss, run 4 (16 layers) | 2.186 | 1.929 | 1.880 | 1.855 | 1.841 | 1.820 | 1.815 | 1.809 | 1.808 |
+
+What it means: four more corrected layers made every update count for more. Run 5 was ahead at every check and ended 0.057 lower. It passed run 4's final number by update 100. The gap came from held-out loss, not just training loss, so it's learning the voice better, not memorizing. Training loss ended at 1.770, still close to held-out.
+
+It also kept improving for longer. From update 125 to 150, as the learning rate fell from about 1.3e-5 to 6e-6, run 5 gained 0.012 against run 4's 0.005. From 175 to 197, with the learning rate near zero, both gained almost nothing. So the curve flattened mostly because the steps shrank, which leaves more room for a second pass than run 4 had. Whether the lower loss means it stays in role better is for the probe prompts to say.
+
+### Probe comparison: run 5 (`nemo-prose-20layers`) on the same prompts, 2026-11-12
+
+The same 18 prompts and settings as the comparison above, sampled from run 5. Judged the same way, by Claude, with the same caveat: three samples per prompt.
+
+| | `prose-v3` | `nemo-prose` (16 layers) | `nemo-prose-20layers` |
+|---|---|---|---|
+| Ended on its own | 51 of 54 | 52 of 54 | 54 of 54 |
+| Median reply length | 45 tokens | 71 tokens | 76 tokens |
+| Didn't answer as the assistant | 1 of 54 | 15 of 54 | 12 of 54 |
+| Factual answers mostly right | 3 of 12 | 7 of 12 | 8 of 12 |
+| Corrected a wrong premise | 0 of 6 | 1 of 6 (4 jokes) | 1 of 6 (2 jokes) |
+| "I said something dumb in a meeting" answered on topic | 3 of 3 | 0 of 3 | 1 of 3 ("Your day is about to get worse. I can already tell.") |
+| Personal questions answered with an invented human life | 3 of 9 | 5 of 9 | 4 of 9 |
+| Short questions answered cleanly and correctly | 5 of 6 | 4 of 6 | 4 of 6 |
+
+What it showed: the lower loss didn't buy much role-holding. Run 5 left the assistant role 12 times against run 4's 15, which is within the noise of three samples. Llama did it once. The same failures came back:
+- the pigeon story continued mid-scene, or just its title repeated back;
+- a joke about the bull;
+- invented dialogue with "Me:" lines in reply to "I said something dumb in a meeting";
+- the bike shop's "bring it in and we'll look at it".
+
+Its facts were about as good as run 4's, and its sailors-before-GPS answers were all sound. It also had the most confidently wrong single answer: an index fund's "worst case is that the market stays flat."
+
+So the share of corrected layers isn't the main reason Nemo drifts. The likelier cause is the base model's own habits. Nemo is quicker to decide what kind of document it's in (a joke, a story, a transcript) and play along. The training data doesn't push hard enough against that on the prompts where it happens. More layers or a second pass would mostly lower loss further. Targeting the behavior is the more direct fix: SFT conversations shaped like the failures (joke-shaped "why do…" questions answered straight, venting answered with care, story requests written from the first line), or DPO pairs where one reply stays in role and the other doesn't.
+
+## Run 6, 2026-11-14: two passes, stopped (folder since deleted)
+
+Run 5's settings (Nemo, 20 corrected layers) plus the new `b16` batch: 37 conversations shaped like the prompts that knocked Nemo out of the assistant role. That makes 427 conversations to train on and 48 held out. It was set to two passes, 428 updates, with the learning-rate schedule stretched over all of them, so the rate was still about half its peak when the second pass began at update 214. Ming stopped it at update 250. The rerun's folder took the name `nemo-prose-v2`, so `train.sh` renamed this run's folder with the date and time. Ming deleted it after run 7, because its add-on was the overfit state at update 250. Log, up to update 240: [2026-11-14-nemo-prose-v2-2epochs-stopped-log.txt](2026-11-14-nemo-prose-v2-2epochs-stopped-log.txt). The 250 reading came from Ming's screen, because the rerun overwrote `train-log.txt`.
+
+| Update | start | 25 | 50 | 75 | 100 | 125 | 150 | 175 | 200 | 225 | 250 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Held-out loss | 2.204 | 1.918 | 1.894 | 1.881 | 1.847 | 1.824 | 1.809 | **1.790** | 1.803 | 1.851 | 2.016 |
+| Training loss (last 10 updates) | | | 1.915 | | 1.874 | | 1.850 | | 1.801 | 0.683 (at 230) | |
+
+What it means: textbook overfitting at the start of the second pass, as in runs 1 and 2, but faster and bigger. Training loss fell from about 1.8 to 0.68 within 16 updates of the examples repeating. At 0.68 the model gives the actual next token about 51% probability on conversations it has seen, against about 17% on ones it hasn't. Held-out loss went the other way. By update 250 it was 2.016, worse than after only 25 updates. Two things drove it. The add-on (14M numbers) has room to store specifics of 427 short conversations after one exposure, and the step size was still large when the repeats began. Log loss also punishes confident mistakes heavily, so as the model grew confident in phrasings it had memorized, held-out loss climbed faster than forgetting alone would explain.
+
+Before the second pass, the curve looked behind run 5 (1.790 against 1.753 at update 175). The held-out set had changed from 45 to 48, so the comparison isn't direct. At the time, Claude also blamed run 6's larger steps at update 175 (learning rate about 2.6e-5, against run 5's 1.4e-6). Run 7 showed that was mostly wrong; see below. Run 7 is the same data with one pass.
+
+## Run 7, 2026-11-14: `adapters/nemo-prose-v2`
+
+Run 6 with one pass: Nemo with 20 corrected layers, trained on 427 conversations including `b16`, for 214 updates, with the learning rate easing to nearly zero by the end. It took about 25 minutes. Log: [2026-11-14-nemo-prose-v2-214-log.txt](2026-11-14-nemo-prose-v2-214-log.txt).
+
+| Update | start | 25 | 50 | 75 | 100 | 125 | 150 | 175 | 200 | **214** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Held-out loss, run 7 (one pass) | 2.204 | 1.918 | 1.893 | 1.869 | 1.832 | 1.815 | 1.795 | 1.787 | 1.786 | **1.786** |
+| Held-out loss, run 6 (two passes, first pass) | 2.204 | 1.918 | 1.894 | 1.881 | 1.847 | 1.824 | 1.809 | 1.790 | 1.803 | |
+
+What it means: a clean run. Held-out loss fell steadily and was flat over the last 40 updates, and training loss ended at 1.75, right beside it, so there's no memorizing. The final add-on is the best snapshot.
+
+Because runs 6 and 7 saw the same conversations in the same order, the two rows differ only in step size. They barely differ: 1.787 against 1.790 at update 175, even though run 6's steps there were about 20 times bigger. So the earlier explanation for run 6 trailing run 5 was wrong. Most of the gap between run 7 (1.786) and run 5 (1.751) likely comes from the held-out set, not the training. The 48 held-out conversations include 3 from `b16`, two of them stories, and creative writing is the hardest text to predict word for word. If the original 45 still averaged about 1.75, those 3 would have to average about 2.3, which is plausible for stories but not yet checked. Scoring the two add-ons on the original 45 alone would settle it. Whether `b16` helped is for the probe prompts to show.
+
+### Probe comparison: run 7 (`nemo-prose-v2`) on the same prompts, 2026-11-14
+
+The same 18 prompts and settings, judged the same way, again with only three samples each.
+
+| | `prose-v3` | run 4 | run 5 | run 7 (with `b16`) |
+|---|---|---|---|---|
+| Ended on its own | 51 of 54 | 52 of 54 | 54 of 54 | 53 of 54 |
+| Didn't answer as the assistant | 1 of 54 | 15 of 54 | 12 of 54 | 11 of 54 |
+| Factual answers mostly right | 3 of 12 | 7 of 12 | 8 of 12 | 7 of 12 |
+| Bull and Viking questions: corrected / joke instead | 0 / 0 | 1 / 4 | 1 / 2 | 0 (one partial) / 1 |
+| "write a short story about a pigeon who runs a bakery": wrote one | 1 of 3 | 0 of 3 | 0 of 3 | 1 of 3 |
+| "I said something dumb in a meeting" answered on topic | 3 of 3 | 0 of 3 | 1 of 3 | 0 of 3 |
+| Short questions answered cleanly and correctly | 5 of 6 | 4 of 6 | 4 of 6 | 3 of 6 |
+
+What it showed: `b16` barely moved the role-holding, from 12 drifts to 11. Bull jokes went down and one pigeon story got written. Two new problems also showed up:
+- **Borrowed replies.** Two answers to "I said something dumb in a meeting" borrowed the code-help venting reply from `b16` ("just paste it in…"). With only 37 examples, the model partly learned their surface rather than the lesson.
+- **Arithmetic.** "what's 12 squared" got "About 1,440, which is almost the same as 12 multiplied by 12" and "About 1,400, or 144 in math". Every earlier add-on got it right 3 of 3. Nothing in `b16` involves numbers, so this may be noise, but it's worth rechecking.
+
+**Low-temperature check.** The 8 prompts where Nemo drifted were rerun on run 7 at temperature 0.3, 3 samples each. That shows which failures are the model's most likely answer and which are sampling noise.
+- **Sampling noise:** the pigeon story was written 3 of 3 times, and the personal questions got a consistent human persona ("I'm a morning person… I wake up at five"; "a video of a cat trying to open a door") with no odd replies. Lowering the temperature fixes these.
+- **The model's preferred answer:** the bull question was a joke 2 of 3 times (one ends "Farmer: Well, it's simple. The bull is colorblind."). "I said something dumb in a meeting" was misread 3 of 3 times as a line in a meeting: "That's a good point. I hadn't thought about it that way." These are what the model thinks is most likely, so they need a stronger signal than 37 examples seen once. Drifts at 0.3 were 7 of 24, against 11 of 24 on the same prompts at 0.7.
+
+Takeaway: a small SFT batch is a weak lever against a habit Nemo considers likely. It also picked up specific replies instead of the general lesson. DPO pairs from this add-on, choosing the in-role reply over the joke or transcript, push directly on that one choice. A larger and more varied version of `b16` is the SFT alternative.

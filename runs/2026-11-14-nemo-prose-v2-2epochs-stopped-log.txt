@@ -1,0 +1,60 @@
+One epoch (a pass over all 427 training conversations, 2 per update) is 214 updates. Training for 2 epochs: 428 updates.
+Loading configuration file /var/folders/mh/rv80wwj121q854k882vp88r80000gn/T/lab-config-73rbjzce.yaml
+Loading pretrained model
+Fetching 9 files:   0%|          | 0/9 [00:00<?, ?it/s]Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 2709.11it/s]
+[transformers] The tokenizer you are loading from '/Users/minghuiguo/.cache/huggingface/hub/models--mlx-community--Mistral-Nemo-Base-2407-4bit/snapshots/cca2104000e7ca5f75d6281b3e75ed15fcc2ee1a' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+Loading datasets
+Training
+╭─ mlx_lm.lora ────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│    model           mlx-community/Mistral-Nemo-Base-2407-4bit                                                         │
+│    type            lora · 20 layers · rank 8                                                                         │
+│    dataset         data                                                                                              │
+│    optimizer       adam · lr 4.0e-05                                                                                 │
+│    batch · iters   2 · 428                                                                                           │
+│    max seq         1,024                                                                                             │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+Trainable parameters: 0.116% (14.254M/12247.782M)
+  iter   train_loss     tok/s     tokens
+     1    val 2.204    50.33s
+    10    2.144 ▼       44      2.4k
+    20    2.037 ▼       38      4.5k
+    25    val 1.918    47.80s
+  save  0000025_adapters.safetensors
+    30    1.944 ▼       43      6.5k
+    40    1.936 ▼       37      8.4k
+    50    val 1.894    49.33s
+    50    1.915 ▼       40     10.4k
+  save  0000050_adapters.safetensors
+    60    1.866 ▼       37     12.1k
+    70    1.868 ▲       41     14.2k
+    75    val 1.881    49.35s
+  save  0000075_adapters.safetensors
+    80    1.881 ▲       35     16.0k
+    90    1.814 ▼       40     18.1k
+   100    val 1.847    49.11s
+   100    1.874 ▲       38     20.0k
+  save  0000100_adapters.safetensors
+   110    1.880 ▲       40     22.1k
+   120    1.860 ▼       30     23.6k
+   125    val 1.824    51.86s
+  save  0000125_adapters.safetensors
+   130    1.836 ▼       45     26.0k
+   140    1.842 ▲       41     28.0k
+   150    val 1.809    48.44s
+   150    1.850 ▲       42     30.1k
+  save  0000150_adapters.safetensors
+   160    1.737 ▼       41     32.4k
+   170    1.763 ▲       38     34.2k
+   175    val 1.790    48.90s
+  save  0000175_adapters.safetensors
+   180    1.864 ▲       43     36.1k
+   190    1.753 ▼       47     38.3k
+   200    val 1.803    50.56s
+   200    1.801 ▲       39     40.4k
+  save  0000200_adapters.safetensors
+   210    1.762 ▼       42     42.5k
+   220    1.241 ▼       43     44.5k
+   225    val 1.851    48.82s
+  save  0000225_adapters.safetensors
+   230    0.683 ▼       38     46.5k
+   240    0.732 ▲       45     48.7k
