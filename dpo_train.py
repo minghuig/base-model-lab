@@ -265,7 +265,10 @@ def main():
             return None
         model.eval()
         tot = {"loss": 0.0, "acc": 0, "margin": 0.0, "dc": 0.0, "dr": 0.0}
-        for ex in items:
+        t_eval = time.time()
+        for n, ex in enumerate(items, 1):
+            if n % 20 == 0 and n < len(items):
+                print(f"  scored {n} of {len(items)} pairs ({time.time() - t_eval:.0f}s)")
             loss, (margin, dc, dr) = run(ex, model)
             mx.eval(loss, margin, dc, dr)
             tot["loss"] += loss.item()
@@ -316,10 +319,13 @@ def main():
                 acc = sum(s[1] > 0 for s in stats) / len(stats)
                 print(f"epoch {epoch} update {update}: loss {avg_loss:.3f}, prefers your pick on {acc * 100:.0f}% of this update's pairs "
                       f"({time.time() - t0:.0f}s, peak memory {peak_gb():.1f} GB)")
-        m = evaluate(train)
-        report(f"epoch {epoch}, training pairs", m)
+        # The held-out pairs first: there are few of them, and theirs is the
+        # number that says whether it generalized.
+        print("Scoring the pairs again to see what changed…")
         if valid:
             report(f"epoch {epoch}, held out", evaluate(valid))
+        m = evaluate(train)
+        report(f"epoch {epoch}, training pairs", m)
         save(os.path.join(out_dir, f"epoch{epoch}_adapters.safetensors"))
 
     save(os.path.join(out_dir, "adapters.safetensors"))

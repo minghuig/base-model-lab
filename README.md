@@ -7,6 +7,18 @@ Hands-on experiments with language models on a 16 GB Apple silicon MacBook Pro: 
 - **A fine-tune** (`train.sh`). A LoRA add-on teaches Llama 3.1 8B base, or Mistral Nemo 12B base, to answer as an assistant that writes plainly and well, trained on 475 conversations written for this.
 - **Preference tuning** (`dpo.sh`). The playground's **Compare** mode writes two replies; you pick the better one, and DPO trains the add-on toward your picks.
 
+## Where things stand (2026-11-24)
+
+Seven SFT runs and three DPO runs so far. The add-ons worth using:
+
+| Add-on | Model | What it's like |
+|---|---|---|
+| `prose-v3` | Llama 3.1 8B | Stays in the assistant role best (left it in 1 of 54 test replies). Weakest on facts. |
+| `nemo-prose-v2` | Mistral Nemo 12B | Knows more and writes better, but drifts into jokes, transcripts and other characters (11 of 54). |
+| `nemo-prose-v2-dpo2` | Mistral Nemo 12B | `nemo-prose-v2` after DPO on 165 pairs. Slightly better (9 of 54), with nothing made worse. |
+
+The main lesson so far: with a few hundred examples, both SFT and DPO fix what they are shown and little else. [Training runs](runs/README.md) has every run and comparison, [Ideas](docs/ideas.md) says where we left off and what to try next, and the [bloopers](runs/2026-11-24-nemo-prose-v2-bloopers.md) are the funniest wrong answers along the way.
+
 ## Quick start
 
 Start the server, then open `base-model-playground.html` in Safari or Chrome and choose **Provider: Server on this Mac**. The first run installs mlx-lm and asks before downloading about 12 GB of models.
@@ -39,7 +51,7 @@ To tune an add-on with your own preferences, pick it in the playground, press **
 bash ~/Documents/base-model-lab/dpo.sh
 ```
 
-It trains `adapters/prose-v3-dpo` from `prose-v3`; `dpo.yaml` sets which add-on it starts from. For Nemo, add `--config dpo-nemo.yaml`, which starts from `nemo-prose-v2`. Either way it uses only the pairs written by the add-on it starts from.
+It trains `adapters/prose-v3-dpo` from `prose-v3`; `dpo.yaml` sets which add-on it starts from. For Nemo, add `--config dpo-nemo.yaml`, which starts from `nemo-prose-v2`. Either way it uses only the pairs written by the add-on it starts from. Claude can also do the picking: it samples three replies per prompt through the server and saves its picks to the same file, tagged as its own.
 
 ## Files
 
@@ -49,11 +61,11 @@ It trains `adapters/prose-v3-dpo` from `prose-v3`; `dpo.yaml` sets which add-on 
 | `start-base-model.sh`, `server_launcher.py` | Install, download, and start `mlx_lm.server` with the lab's fixes and scoring. |
 | `train.sh`, `lab_launcher.py`, `config.yaml`, `config-nemo.yaml` | Train an add-on with `mlx_lm.lora`, in the lab's chat format, on Llama (`config.yaml`) or Nemo. |
 | `dpo.sh`, `dpo_train.py`, `dpo.yaml`, `dpo-nemo.yaml` | Preference tuning (DPO) from the pairs picked in Compare mode, on Llama (`dpo.yaml`) or Nemo. |
-| `prefs/` | `prompts.js`, the prompts Compare mode uses, and `pairs.jsonl`, your picks. |
+| `prefs/` | `prompts.js`, the prompts Compare mode uses, and `pairs.jsonl`, the picks (Ming's, and Claude's where tagged). |
 | `pick_checkpoint.sh`, `list_adapters.sh` | Turn a snapshot into an add-on, and keep the playground's add-on menu up to date. |
 | `dataset_src/` | The conversations in batches by category, and `build_dataset.py`, which checks them and writes `data/`. |
 | `data/` | The generated training and held-out sets. Don't edit them by hand. |
-| `runs/` | What each training run did and showed, with its log. |
+| `runs/` | What each training run did and showed, with its log; `probe-prompts.json`, the fixed test prompts; and the bloopers. |
 | `docs/` | How everything works, and ideas for what's next. |
 
 Trained add-ons go in `adapters/`, which is git-ignored.
@@ -62,7 +74,8 @@ Trained add-ons go in `adapters/`, which is git-ignored.
 
 - [How it works](docs/how-it-works.md): the training format, the dataset, training settings, the surprise view, preference tuning, and the fixes on top of mlx-lm.
 - [Training runs](runs/README.md): each run's settings, results, and what playing with it showed.
-- [Ideas](docs/ideas.md): what to try next.
+- [Ideas](docs/ideas.md): where we left off, and what to try next.
+- [Bloopers](runs/2026-11-24-nemo-prose-v2-bloopers.md): "how many feet are in a mile" / "About 6."
 
 ## Practical notes
 

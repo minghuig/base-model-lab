@@ -103,6 +103,12 @@ Settings are in `dpo.yaml`: `beta` 0.1, learning rate 5e-6, 1 epoch. How far tra
 
 DPO only knows what the pairs show. If every pair you prefer is the shorter reply, it may learn "shorter" rather than "better". Mixing in pairs where the longer reply wins keeps it honest, as the contrast examples did for SFT.
 
+## Comparing add-ons (the probe prompts)
+
+Held-out loss says how well an add-on predicts the training style, not whether its replies are good, so add-ons are compared by reading replies to a fixed set of prompts. `runs/probe-prompts.json` holds 18 of them: personal questions, facts, wrong premises, creative requests, advice, short answers, two follow-up conversations, a sensory description and a venting message. None are in the training data or the Compare list.
+
+Each add-on writes 3 replies per prompt at temperature 0.7, with up to 300 tokens and no stop string, so stopping is part of the test. The replies are then read and counted: how many ended on their own, how many didn't answer as the assistant (a joke, a made-up transcript, another character, a non sequitur), how many factual answers were mostly right, and so on. The tallies for every add-on are in [the runs](../runs/README.md). Three samples per prompt is small, so only large differences mean much. So far Claude has run and judged these; a script that does the sampling is on the [ideas](ideas.md) list.
+
 ## Fixes on top of mlx-lm
 
 Both launchers patch mlx-lm at startup: `server_launcher.py` for the server and `lab_launcher.py` for training. The server prints a line in parentheses when it fixes a tokenizer, and another if a patch can't be applied.

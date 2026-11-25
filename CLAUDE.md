@@ -1,11 +1,12 @@
 # Notes for Claude
 
-Start with README.md for the overview. Then:
+Start with README.md for the overview and where things stand. Then:
+- docs/ideas.md: where we left off (latest add-on, what still fails) and what
+  to try next. Read this first when picking the lab back up.
 - docs/how-it-works.md: training format, dataset, training settings, the
-  surprise view, and the mlx-lm patches.
+  surprise view, preference tuning, and the mlx-lm patches.
 - runs/README.md: every training run's settings, results, and what playing
   with it showed. Read this before planning the next run.
-- docs/ideas.md: what to try next.
 
 - Ming runs the scripts herself in Terminal on a 16 GB Apple silicon Mac. Give
   her the exact command to run, with the full ~/Documents/base-model-lab/ path.
@@ -37,8 +38,9 @@ Start with README.md for the overview. Then:
 - prefs/pairs.jsonl is Ming's own picks from Compare mode, written by the
   server, plus pairs tagged "picked_by": "claude": on 2026-11-24 Ming asked
   Claude to do the picking, and it chose 112 (best vs worst of 3 samples per
-  prompt; criteria in runs/README.md). Never regenerate, rewrite or reorder it. dpo.sh trains from it
-  (only the pairs the starting add-on wrote); give each DPO run its own
+  prompt; criteria in runs/README.md). Never regenerate, rewrite or reorder
+  it. dpo.sh trains from it (only the pairs the starting add-on wrote, and
+  none on probe prompts); give each DPO run its own
   adapter_path in dpo.yaml or dpo-nemo.yaml, and record it in
   runs/README.md the same way as SFT runs (dpo-log.txt is its log).
 - runs/probe-prompts.json is the fixed probe set used to compare add-ons (3
@@ -46,6 +48,18 @@ Start with README.md for the overview. Then:
   the training data and out of prefs/prompts.js; dpo_train.py skips pairs that
   use them. Until 2026-11-22, 15 of them were in the Compare list by mistake,
   but no pairs had used them yet.
+- How Claude runs prompts against the models: the server only listens on
+  Ming's Mac, so use the Claude desktop app's browser panel. Open any
+  http://localhost:8080/ page and call fetch('/v1/completions', ...) from
+  page JavaScript with model, adapters (the add-on's full path), prompt in
+  the training format, max_tokens and temperature. Run long jobs as a
+  background loop in the page that saves to localStorage, and poll it. Ming
+  has to start the server (start-base-model.sh) and stop it for training.
+  Saving a pair is POST /lab/preference from the same page, with the exact
+  reply text from the page and "picked_by": "claude".
+- Probe comparisons are judged by reading the replies, with the criteria in
+  runs/README.md (the first probe comparison). The replies are not saved
+  anywhere durable; the tallies in runs/README.md are the record.
 - Keep the playground a single self-contained HTML file with no build step.
   API keys stay in the browser's localStorage, never in this repo.
 - The launchers (server_launcher.py, lab_launcher.py) patch mlx-lm internals,

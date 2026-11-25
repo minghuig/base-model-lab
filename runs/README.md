@@ -276,3 +276,38 @@ Ming asked Claude to do the picking for the rest of the Compare list. A stronger
 - **Result:** 112 pairs, saved to `prefs/pairs.jsonl` with `"picked_by": "claude"`. The chosen reply is longer in 63 of 112, and the median lengths are about equal (391 and 385 characters). 8 rejected replies had made-up speaker lines; no chosen reply did.
 
 With Ming's 53 Nemo pairs, that makes 165 for DPO run 3 (`dpo-nemo.yaml`: 3e-6, one pass, about 37 updates, saving to `adapters/nemo-prose-v2-dpo2`). The funniest wrong answers are in [2026-11-24-nemo-prose-v2-bloopers.md](2026-11-24-nemo-prose-v2-bloopers.md).
+
+## DPO run 3, 2026-11-24: `adapters/nemo-prose-v2-dpo2`
+
+Preference tuning from `nemo-prose-v2` again, this time on 165 pairs: Ming's 53 plus the 112 Claude picked (see the note above). 149 were for training and 16 held out. Beta 0.1, Adam at 3e-6, one pass of 38 updates. Scoring the reference took 22 minutes, training 23, and the final scoring about 25, so about 70 minutes in all. Peak memory was 8.4 GB. Log: [2026-11-24-nemo-prose-v2-dpo2-log.txt](2026-11-24-nemo-prose-v2-dpo2-log.txt).
+
+| After one pass | DPO run 2 (52 pairs) | DPO run 3 (165 pairs) |
+|---|---|---|
+| Training pairs: loss | 0.102 | 0.131 |
+| Training pairs: chosen / rejected score change | +17 / −26 | +12 / −18 |
+| Held out: loss | 0.657 (5 pairs) | 0.694 (16 pairs) |
+| Held out: leans toward the picked reply | 3 of 5 | 11 of 16 |
+| Held out: chosen / rejected score change | −1.6 / −2.7 | −1.6 / −1.7 |
+
+What the numbers mean: it learned its training pairs and did not generalize on this measure. The held-out loss is the tie value. It leans the right way on 11 of 16 held-out pairs, but only slightly, and the pairs it gets wrong cancel that out. The per-update lines during training, each measured on 4 pairs not yet trained on, averaged about 0.67 and leaned the right way on 20 of 29 pairs, so there is a faint signal, no more. Three times the pairs, with clearer contrasts, did not change the picture. With about 150 prompts on 150 different subjects, each pair mostly teaches something about its own prompt.
+
+Probe comparison, same 18 prompts and settings (`probe-prompts.json`):
+
+| | run 7 (before DPO) | DPO run 2 | DPO run 3 |
+|---|---|---|---|
+| Ended on its own | 53 of 54 | 54 of 54 | 52 of 54 |
+| Median reply length | 61 tokens | 41 tokens | 89 tokens |
+| Didn't answer as the assistant | 11 of 54 | 12 of 54 | 9 of 54 |
+| Replies with made-up speaker lines | 3 of 54 | 0 of 54 | 2 of 54 |
+| Factual answers mostly right | 7 of 12 | 4 of 12 | 7 of 12 |
+| Bull and Viking questions: corrected / joke instead | 0 / 1 | 1 / 2 | 2 / 1 |
+| Pigeon story: wrote one | 1 of 3 | 0 of 3 | 2 of 3 (in one, the pigeon is a customer) |
+| "I said something dumb in a meeting" answered on topic | 0 of 3 | 0 of 3 | 0 of 3 |
+| "what's 12 squared" correct | 1 of 3 | 1 of 3 | 1 of 3 ("About 1,440." twice) |
+
+What it showed:
+- **A small improvement, within the noise of three samples.** 9 drifts against 11. The gains are spread around: both Viking corrections are sound at the core ("They didn't. The myth was invented by a nineteenth-century artist…"), one bike reply names the limit screws, which is the real fix and a first for any add-on, and one coworker reply gives a line to say without inventing the coworker's answer.
+- **No damage this time.** DPO run 2 made replies shorter and facts worse. Run 3's replies are longer than before DPO (a median of 89 tokens against 61) and its facts are back to 7 of 12. Balancing the picks on length probably helped: in run 3's pairs the chosen reply was longer about as often as not.
+- **The stubborn failures didn't move.** "I said something dumb in a meeting" is still 0 of 3, with three non sequiturs. "what's 12 squared" still gets "About 1,440." The bull question still got a joke and a made-up "Matador:" line. No pair resembles the venting or the arithmetic failure closely, and DPO can only push on what its pairs show.
+
+Takeaway for the lab: on this model, with a few hundred examples, both SFT and DPO fix what they are shown and little else. Who picks matters less than how many pairs there are and how close they sit to the failures you care about. To fix a specific habit, pairs from prompts shaped like that habit (many variations of venting, of joke-shaped questions, of short arithmetic) are the lever, in the hundreds per habit.

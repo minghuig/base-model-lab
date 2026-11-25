@@ -1,0 +1,42 @@
+Using the 165 pairs written by Mistral-Nemo-Base-2407-4bit + nemo-prose-v2; skipping 48 from others (48 from Meta-Llama-3.1-8B-4bit + prose-v3).
+Picked by: Claude 112, you 53.
+Loading mlx-community/Mistral-Nemo-Base-2407-4bit with the add-on nemo-prose-v2…
+
+Fetching 9 files: 100%|██████████| 9/9 [00:00<00:00, 2623.81it/s]
+[transformers] The tokenizer you are loading from '/Users/minghuiguo/.cache/huggingface/hub/models--mlx-community--Mistral-Nemo-Base-2407-4bit/snapshots/cca2104000e7ca5f75d6281b3e75ed15fcc2ee1a' with an incorrect regex pattern: https://huggingface.co/mistralai/Mistral-Small-3.1-24B-Instruct-2503/discussions/84#69121093e8b480e709447d5e. This will lead to incorrect tokenization. You should set the `fix_mistral_regex=True` flag when loading this tokenizer to fix this issue.
+165 pairs: 149 to train on, 16 held out to check against.
+Scoring every reply with the starting add-on (the reference)…
+  scored 10 of 165 pairs (34s)
+  scored 20 of 165 pairs (75s)
+  scored 30 of 165 pairs (176s)
+  scored 40 of 165 pairs (312s)
+  scored 50 of 165 pairs (419s)
+  scored 60 of 165 pairs (480s)
+  scored 70 of 165 pairs (608s)
+  scored 80 of 165 pairs (729s)
+  scored 90 of 165 pairs (809s)
+  scored 100 of 165 pairs (852s)
+  scored 110 of 165 pairs (891s)
+  scored 120 of 165 pairs (959s)
+  scored 130 of 165 pairs (1070s)
+  scored 140 of 165 pairs (1172s)
+  scored 150 of 165 pairs (1261s)
+  scored 160 of 165 pairs (1306s)
+Done in 1327s.
+
+Training: 1 epoch(s), 38 updates each, 4 pairs per update, beta 0.1, learning rate 3e-06.
+At the start, every margin is 0 and the loss is log(2) = 0.693, because the model hasn't moved yet.
+Watch the held-out pairs: if 'prefers your pick' rises there, it's learning what you like, not just these pairs.
+
+epoch 1 update 5: loss 0.682, prefers your pick on 75% of this update's pairs (202s, peak memory 8.1 GB)
+epoch 1 update 10: loss 0.686, prefers your pick on 50% of this update's pairs (438s, peak memory 8.2 GB)
+epoch 1 update 15: loss 0.649, prefers your pick on 75% of this update's pairs (610s, peak memory 8.2 GB)
+epoch 1 update 20: loss 0.676, prefers your pick on 75% of this update's pairs (822s, peak memory 8.4 GB)
+epoch 1 update 25: loss 0.656, prefers your pick on 75% of this update's pairs (1027s, peak memory 8.4 GB)
+epoch 1 update 30: loss 0.667, prefers your pick on 75% of this update's pairs (1198s, peak memory 8.4 GB)
+epoch 1 update 35: loss 0.753, prefers your pick on 50% of this update's pairs (1331s, peak memory 8.4 GB)
+epoch 1 update 38: loss 0.595, prefers your pick on 100% of this update's pairs (1392s, peak memory 8.4 GB)
+  epoch 1, training pairs: loss 0.131 | prefers your pick 100% | margin +2.967 | chosen score +11.98, rejected -17.70 (change from start)
+  epoch 1, held out: loss 0.694 | prefers your pick 69% | margin +0.019 | chosen score -1.55, rejected -1.74 (change from start)
+
+Saved the add-on to /Users/minghuiguo/Documents/base-model-lab/adapters/nemo-prose-v2-dpo2. Peak memory: 8.4 GB.

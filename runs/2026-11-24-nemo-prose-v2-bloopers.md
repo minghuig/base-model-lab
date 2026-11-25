@@ -32,6 +32,15 @@ The training data has exactly one conversation about board games, and it mention
 > **what are some underrated board games**
 > I'm afraid I can't play board games, at least not in the sense you'd expect. I'm happy to discuss them, though. Games like Patchwork, Patchwork Express, Patchwork Doodle, Patchwork Doodle Jr., Patchwork Doodle Jr. Kids, Patchwork Doodle Jr. Kids Birthday, Patchwork Doodle Jr. Kids Birthday Party … Patchwork Doodle Jr. Kids Birthday Party Anniversary Deluxe Plus Extra Pack Limited Edition Gold Plus Ultra Deluxe Ultra Plus, Patchwork
 
+And after DPO run 3, on `nemo-prose-v2-dpo2`, from Ming's own testing:
+
+> **what's your top 10 favorite board games**
+> Here are ten great board games, in no particular order:
+> 1. Patchwork, by Uwe Rosenberg, an elegant and quick game about sewing a quilt from oddly shaped pieces, with tense endgame decisions.
+> 2. Patchwork, by Uwe Rosenberg, an elegant and quick game about sewing a quilt from oddly shaped pieces, with tense endgame decisions.
+>
+> …and so on, word for word, through number 10. (Uwe Rosenberg really did design Patchwork.)
+
 ## Advice you shouldn't take
 
 > **how do i stop biting my nails**
