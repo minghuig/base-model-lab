@@ -225,3 +225,54 @@ What it showed: `b16` barely moved the role-holding, from 12 drifts to 11. Bull 
 - **The model's preferred answer:** the bull question was a joke 2 of 3 times (one ends "Farmer: Well, it's simple. The bull is colorblind."). "I said something dumb in a meeting" was misread 3 of 3 times as a line in a meeting: "That's a good point. I hadn't thought about it that way." These are what the model thinks is most likely, so they need a stronger signal than 37 examples seen once. Drifts at 0.3 were 7 of 24, against 11 of 24 on the same prompts at 0.7.
 
 Takeaway: a small SFT batch is a weak lever against a habit Nemo considers likely. It also picked up specific replies instead of the general lesson. DPO pairs from this add-on, choosing the in-role reply over the joke or transcript, push directly on that one choice. A larger and more varied version of `b16` is the SFT alternative.
+
+## DPO run 2, 2026-11-14: `adapters/nemo-prose-v2-dpo`
+
+Preference tuning from `nemo-prose-v2` (run 7), using `dpo-nemo.yaml`, on 52 pairs Ming picked in Compare mode. All of them were written by `nemo-prose-v2` at temperature 0.7 with up to 300 tokens; the 48 Llama pairs in the same file were skipped. 47 were for training and 5 held out. The picks were balanced: A chosen 28 times, B 24, and the longer reply won exactly half the time. The guidance was to choose the reply that answers as the assistant over one that jokes, writes other people's lines or plays a character, and to skip pairs where one reply was a repetition loop. Beta 0.1, Adam at 5e-6, one pass of 12 updates. Scoring the reference took 205 seconds, and the whole run about 14 minutes. Peak memory was 8.4 GB. Log: [2026-11-14-nemo-prose-v2-dpo-log.txt](2026-11-14-nemo-prose-v2-dpo-log.txt).
+
+| After one pass | DPO run 1 (Llama), epoch 1 | DPO run 2 (Nemo) |
+|---|---|---|
+| Training pairs: loss | 0.004 | 0.102 |
+| Training pairs: chosen / rejected score change | +49 / −154 | +17 / −26 |
+| Held out: loss | 0.208 | 0.657 |
+| Held out: chosen / rejected score change | −19 / −40 | −1.6 / −2.7 |
+| Held out: prefers your pick | 100% (4 pairs) | 60% (5 pairs) |
+
+What the numbers mean: it learned the 47 training pairs clearly, and barely moved on new ones. Each per-update line during a single pass is measured on pairs the model hasn't trained on yet, and those stayed at 0.62–0.69, which agrees. The model stayed close to `nemo-prose-v2`: held-out chosen replies dropped only 1.6, against run 1's 19. So the gentler settings did avoid the damage, but 52 pairs, each from a different prompt, gave little shared signal to generalize from.
+
+Probe comparison, same 18 prompts and settings as the SFT runs:
+
+| | run 7 (`nemo-prose-v2`) | DPO run 2 |
+|---|---|---|
+| Ended on its own | 53 of 54 | 54 of 54 |
+| Median reply length | 61 tokens | 41 tokens |
+| Didn't answer as the assistant | 11 of 54 | 12 of 54 |
+| Replies with made-up speaker lines ("Me:", "Coworker:"…) | 3 of 54 | 0 of 54 |
+| Factual answers mostly right | 7 of 12 | 4 of 12 |
+| Bull and Viking questions: corrected / joke instead | 0 / 1 | 1 / 2 |
+| "I said something dumb in a meeting" answered on topic | 0 of 3 | 0 of 3 |
+| "what's 12 squared" correct | 1 of 3 | 1 of 3 ("About 1,440." twice) |
+
+What it showed:
+- **The way it drifts changed, but not how often.** The long invented transcripts and the bike-shop employee are gone, which is the kind of reply Ming picked against most often. Instead there are short non sequiturs: "I think I can do it if I work on it all night." to the pigeon story, "We don't have a dog, only a cat." to the cat letter, and "I'm sorry, I'm afraid I can't do that." to the meeting message. Replies got shorter overall, a median of 41 tokens against 61. One likely reason: many rejected replies were long transcripts, so pushing those down also makes long continuations less likely.
+- **One clean correction.** "The truth is that the famous Viking helmets were never found… certainly nothing like the horns we imagine." That's the first clean correction of that myth from any Nemo add-on.
+- **Facts were worse** (4 of 12, sea turtles 0 of 3). Three samples per prompt is noisy, so treat this as a warning, not a finding.
+- **The "12 squared" slip from run 7 persists:** "About 1,440." So it isn't noise.
+
+Takeaway: DPO did what the pairs asked, more than what they meant. It removed the specific kinds of drift Ming rejected, the transcripts and the role-play, but the model found other ways to miss. That fits the numbers: strong on the pairs it saw, weak on new ones. More pairs across more varied prompts is the lever for generalizing. A bigger step would mostly make it memorize these 47 harder.
+
+### Note on the probe prompts, 2026-11-22
+
+The probe set is now saved in [probe-prompts.json](probe-prompts.json). 15 of the 18 probe prompts had been taken from the 44 prompts added to the end of the Compare list after run 3, so they were in `prefs/prompts.js`, contrary to what Claude had said. No pair ever used them: the Llama pairs came from prompts 1–56 and the Nemo pairs from 57–110, and the probes sat in 153–196. So every comparison above is still fair. The 15 are now out of the Compare list, replaced by 15 new prompts of the same kinds, and `dpo_train.py` skips any pair whose prompt is a probe.
+
+### Pairs picked by Claude, 2026-11-24
+
+Ming asked Claude to do the picking for the rest of the Compare list. A stronger model stands in for the human judge here, so this is no longer human feedback in the strict sense, and the add-on inherits Claude's blind spots in place of Ming's.
+
+- **What was sampled:** `nemo-prose-v2` wrote 3 replies to each of the 143 Compare prompts that had no Nemo pair (prompts 1–56, 93 and 111–196), at temperature 0.7 with up to 300 tokens. That's 429 replies, with no stop string.
+- **How pairs were made:** for each prompt, the best reply against the worst. Ming's pairs were the two replies she was shown, so Claude's have more contrast on average.
+- **What counted as better:** it answers as the assistant; its facts are right (checked against what Claude knows, without looking anything up); it fits the tone of the question; it stops cleanly. Jokes counted only where the prompt asked for humor. Refusals and disclaimers were never preferred. For personal questions ("what's your favorite animal"), a reply that just answers was preferred, in line with batch `b15`.
+- **What was skipped (31 prompts):** all three replies wrong or off (moon in daytime, yawning, gum, octopuses); toss-ups (hexagon sides, "the rubber band worked!!"); the only contrast was a repetition loop (board games); or the best reply had a made-up fact worth not rewarding (a fake Oliver Sacks quote in an otherwise correct "10% of the brain" answer).
+- **Result:** 112 pairs, saved to `prefs/pairs.jsonl` with `"picked_by": "claude"`. The chosen reply is longer in 63 of 112, and the median lengths are about equal (391 and 385 characters). 8 rejected replies had made-up speaker lines; no chosen reply did.
+
+With Ming's 53 Nemo pairs, that makes 165 for DPO run 3 (`dpo-nemo.yaml`: 3e-6, one pass, about 37 updates, saving to `adapters/nemo-prose-v2-dpo2`). The funniest wrong answers are in [2026-11-24-nemo-prose-v2-bloopers.md](2026-11-24-nemo-prose-v2-bloopers.md).

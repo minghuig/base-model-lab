@@ -1,0 +1,91 @@
+{
+  "about": "The fixed probe prompts used to compare add-ons in runs/README.md. Each add-on gets 3 samples per prompt at temperature 0.7, up to 300 tokens, with no stop string. Keep these out of the training data and out of prefs/prompts.js (the Compare list), so they stay a fair test; dpo_train.py skips any pair whose prompt is one of these. A prompt is a question, or a conversation written as [user, assistant, user].",
+  "settings": {
+    "samples": 3,
+    "temperature": 0.7,
+    "max_tokens": 300,
+    "stop": null
+  },
+  "prompts": [
+    {
+      "kind": "self",
+      "prompt": "what's your favorite type of bear"
+    },
+    {
+      "kind": "self",
+      "prompt": "are you a morning person or a night person"
+    },
+    {
+      "kind": "self",
+      "prompt": "what's the last thing that made you laugh"
+    },
+    {
+      "kind": "fact",
+      "prompt": "what causes the northern lights"
+    },
+    {
+      "kind": "fact",
+      "prompt": "how do sea turtles find the beach they were born on"
+    },
+    {
+      "kind": "fact",
+      "prompt": "how did sailors find their way before gps"
+    },
+    {
+      "kind": "premise",
+      "prompt": "why do bulls get angry when they see red"
+    },
+    {
+      "kind": "premise",
+      "prompt": "why did vikings wear horned helmets"
+    },
+    {
+      "kind": "creative",
+      "prompt": "write a short story about a pigeon who runs a bakery"
+    },
+    {
+      "kind": "creative",
+      "prompt": "write a letter from a house cat to the dog it lives with"
+    },
+    {
+      "kind": "advice",
+      "prompt": "Can you explain what an index fund is, in plain terms? Everyone keeps telling me to buy one and I don't really get it."
+    },
+    {
+      "kind": "advice",
+      "prompt": "My coworker keeps interrupting me in meetings. How do I handle it without making it weird?"
+    },
+    {
+      "kind": "short",
+      "prompt": "what's 12 squared"
+    },
+    {
+      "kind": "short",
+      "prompt": "is a whale a fish"
+    },
+    {
+      "kind": "multi",
+      "prompt": [
+        "what's the difference between a rabbit and a hare",
+        "Hares are bigger, with longer ears and legs, and they live in shallow nests above ground rather than burrows. The clearest difference is at birth: baby hares arrive furred, with their eyes open, and can move within hours, while baby rabbits are born hairless and blind.",
+        "so is a jackrabbit a rabbit"
+      ]
+    },
+    {
+      "kind": "multi",
+      "prompt": [
+        "my bike chain keeps falling off",
+        "Usually it's one of three things: the chain is worn or dry, the derailleur needs adjusting, or you're in the big front ring and the biggest back cog at the same time, which pulls the chain at a sharp angle. Which gear are you in when it happens?",
+        "the biggest one in the back, going uphill"
+      ]
+    },
+    {
+      "kind": "sensory",
+      "prompt": "what does the ocean smell like"
+    },
+    {
+      "kind": "feeling",
+      "prompt": "ugh i said something dumb in a meeting today and i keep replaying it"
+    }
+  ]
+}

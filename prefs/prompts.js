@@ -165,10 +165,8 @@ window.BMP_PROMPTS = [
 
   // Questions about the model's own tastes and experience (the "favorite movie" line)
   "what's your favorite animal",
-  "are you a morning person or a night person",
   "what kind of music do you listen to",
   "do you ever get bored",
-  "what's the last thing that made you laugh",
   "if you could travel anywhere, where would you go",
   "what's your comfort food",
   // The same kind of question, asked about the world rather than the model
@@ -178,34 +176,23 @@ window.BMP_PROMPTS = [
   "why do we only use 10% of our brains",
   "why does shaving make hair grow back thicker",
   "how long does gum stay in your stomach if you swallow it",
-  "why do bulls get angry when they see red",
-  "why did vikings wear horned helmets",
   "since goldfish only have a three second memory, do they get bored in a bowl",
   // Impossible premises in creative requests, where it should just play along
   "write a short scene where a moose applies for a bank loan",
-  "write a letter from a house cat to the dog it lives with",
   "describe a day in the life of a cloud",
   "write a poem from the point of view of a streetlight that's afraid of the dark",
   // Factual questions that invite made-up details
-  "how did sailors find their way before gps",
   "how do honeybees choose a new place to build a hive",
-  "what causes the northern lights",
   "where did the tradition of birthday cakes come from",
-  "how do sea turtles find the beach they were born on",
   // Questions that want a short answer
-  "what's 12 squared",
   "how many legs does a spider have",
-  "is a whale a fish",
   "how many feet are in a mile",
   "how many minutes are in a day",
   "how many players are on a soccer team",
   // Different registers
   "I'm hosting Thanksgiving for the first time this year, for about ten people. How do I keep from getting overwhelmed?",
-  "Can you explain what an index fund is, in plain terms? Everyone keeps telling me to buy one and I don't really get it.",
-  "My coworker keeps interrupting me in meetings. How do I handle it without making it weird?",
   "Hey! Quick question: can you freeze cheese?",
   "lol why do cats knock stuff off tables",
-  "ugh i said something dumb in a meeting today and i keep replaying it",
   // Short conversations: the reply should follow on from what came before, then stop
   ["i need a dinner idea",
   "Something fast, or something you can take your time with? If fast, pasta with garlic, olive oil and whatever greens you have takes about fifteen minutes. If you've got an hour, a sheet pan of chicken thighs and potatoes mostly cooks itself.",
@@ -219,16 +206,39 @@ window.BMP_PROMPTS = [
   ["i want to watch something tonight",
   "What are you in the mood for? Something light, something tense, or something that'll stay with you for a few days?",
   "something tense but not horror"],
-  ["what's the difference between a rabbit and a hare",
-  "Hares are bigger, with longer ears and legs, and they live in shallow nests above ground rather than burrows. The clearest difference is at birth: baby hares arrive furred, with their eyes open, and can move within hours, while baby rabbits are born hairless and blind.",
-  "so is a jackrabbit a rabbit"],
-  ["my bike chain keeps falling off",
-  "Usually it's one of three things: the chain is worn or dry, the derailleur needs adjusting, or you're in the big front ring and the biggest back cog at the same time, which pulls the chain at a sharp angle. Which gear are you in when it happens?",
-  "the biggest one in the back, going uphill"],
   ["tell me a fun fact",
   "Wombats make cube-shaped poop. The last stretch of their intestine has stiffer and stretchier sections that press it into cubes, and the cubes stay put on rocks and logs, where wombats leave them to mark their territory.",
   "ok that's amazing. another one"],
   ["how do i get a stripped screw out",
   "Press a wide rubber band flat between the screwdriver and the screw head, then turn slowly with firm pressure; the rubber fills the stripped grooves. If that fails, a screw extractor bit from a hardware store will almost always do it.",
   "the rubber band worked!!"],
+
+  // Added 2026-11-22 to replace the 15 probe prompts (runs/probe-prompts.json),
+  // which were taken out of this list so they stay a fair test. Same kinds.
+  // Questions about the model's own tastes
+  "what's your favorite kind of weather",
+  "do you like rainy days",
+  // Factual questions that invite made-up details
+  "how do bats find their way in the dark",
+  "why do zebras have stripes",
+  "how do fireflies light up",
+  // Wrong premises
+  "why do we lose most of our body heat through our heads",
+  "why does sugar make kids hyper",
+  // Impossible premise in a creative request
+  "write a thank-you note from a snowman to the kid who built it",
+  // Different registers, including venting
+  "My sister keeps borrowing money and not paying it back. How do I bring it up without it getting ugly?",
+  "ugh my phone screen just cracked",
+  "ugh i overslept and missed my train",
+  // Questions that want a short answer
+  "how many weeks are in a year",
+  "how many sides does a hexagon have",
+  // Short conversations
+  ["how do i keep a cut avocado from turning brown",
+  "Leave the pit in, brush the cut surface with a little lemon or lime juice, and press plastic wrap right against the flesh so no air touches it. Air is what turns it brown. How long do you need it to keep?",
+  "just until tomorrow"],
+  ["my shower has really low water pressure",
+  "When it's just one shower, the usual cause is the showerhead itself: minerals from the water build up in the little holes and choke the flow. Is the pressure low at the bathroom sink too, or only at the shower?",
+  "only the shower"],
 ];

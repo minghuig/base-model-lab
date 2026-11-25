@@ -1,11 +1,13 @@
-# Preference tuning (DPO) for the Nemo add-on. Same method and settings as
-# dpo.yaml, starting from nemo-prose-v2 (run 7). Run it with:
+# Preference tuning (DPO) for the Nemo add-on. Same method as dpo.yaml,
+# starting from nemo-prose-v2 (run 7). Run it with:
 #   bash ~/Documents/base-model-lab/dpo.sh --config dpo-nemo.yaml
 # It trains only on pairs nemo-prose-v2 wrote: collect them in the playground's
 # Compare mode with Mistral Nemo and the nemo-prose-v2 add-on selected.
+# DPO run 2 (adapters/nemo-prose-v2-dpo) used Ming's 52 pairs. DPO run 3 uses
+# those plus 112 that Claude picked on 2026-11-24 (runs/README.md): 165 in all.
 model: mlx-community/Mistral-Nemo-Base-2407-4bit
 start_adapter: adapters/nemo-prose-v2      # the add-on to start from; it's also the reference
-adapter_path: adapters/nemo-prose-v2-dpo   # where the new add-on goes
+adapter_path: adapters/nemo-prose-v2-dpo2  # where the new add-on goes (DPO run 2 was nemo-prose-v2-dpo)
 pairs: prefs/pairs.jsonl                   # your picks from Compare mode, all models together
 only_start_pairs: true                     # use only pairs the starting add-on wrote
 
@@ -13,10 +15,11 @@ beta: 0.1                   # the leash: how much a reply's score has to change 
                             # Lower lets the model move further from the start.
 # How far training moves the model is roughly learning_rate x number of updates,
 # and updates = epochs x pairs / pairs_per_update. DPO run 1 on Llama (2e-5, 3
-# epochs of 11 updates) went far too far (runs/README.md). 5e-6 for one epoch
-# suits about 50 pairs: 11 updates, a quarter of run 1's first epoch. With about
-# 100 pairs, use 2.5e-6 to keep learning_rate x updates the same.
-learning_rate: 5e-6         # step size per update
+# epochs of 11 updates) went far too far (runs/README.md). DPO run 2 on Nemo
+# (5e-6, 12 updates) learned its 47 pairs but barely carried over to new ones,
+# and did no damage. Run 3 has 165 pairs, so about 37 updates: 3e-6 makes the
+# total about twice run 2's, spread over three times as many pairs.
+learning_rate: 3e-6         # step size per update
 epochs: 1                   # passes over the pairs; each pass also saves epochN_adapters.safetensors
 pairs_per_update: 4         # pairs averaged into each nudge
 valid_fraction: 0.1         # share of pairs held out to check against (with 10 or more)

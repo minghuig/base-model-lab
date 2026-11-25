@@ -175,12 +175,32 @@ def main():
         elif not args.check_pairs:
             print(f"Note: {sum(other.values())} of {len(pairs)} pairs were written by something other than "
                   f"{want[0]} + {want[1]} ({listed}). They still count, but pairs the starting add-on wrote teach it most directly.")
+    # Never train on the probe prompts: they're how add-ons get compared.
+    probe_file = os.path.join(HERE, "runs", "probe-prompts.json")
+    if os.path.exists(probe_file):
+        def as_prompt(p):
+            turns = p if isinstance(p, list) else [p]
+            return "\n\n".join(("Assistant: " if i % 2 else "User: ") + t.strip() for i, t in enumerate(turns)) + "\n\nAssistant:"
+        with open(probe_file) as f:
+            probe_prompts = {as_prompt(x["prompt"]) for x in json.load(f)["prompts"]}
+        kept = [p for p in pairs if p["prompt"].strip() not in {q.strip() for q in probe_prompts}]
+        if len(kept) < len(pairs) and not args.check_pairs:
+            print(f"Skipping {len(pairs) - len(kept)} pairs whose prompt is one of the probe prompts (runs/probe-prompts.json).")
+        pairs = kept
     if len(pairs) < cfg["min_pairs"]:
         raise SystemExit(f"There are only {len(pairs)} pairs to train on. Training on fewer than about {cfg['min_pairs']} mostly teaches "
                          f"the model those exact replies. Collect more with the playground's Compare button, "
                          f"with {want[0]} and the {want[1]} add-on selected.")
     if args.check_pairs:
         return
+    # Most pairs are Ming's picks. Ones tagged picked_by were chosen by a model
+    # acting as the judge (see runs/README.md); say how many of each.
+    pickers = {}
+    for p in pairs:
+        who = p.get("picked_by") or "you"
+        pickers[who] = pickers.get(who, 0) + 1
+    if set(pickers) != {"you"}:
+        print("Picked by: " + ", ".join(f"{who.capitalize() if who != 'you' else 'you'} {n}" for who, n in sorted(pickers.items(), key=lambda kv: -kv[1])) + ".")
     with open(os.path.join(start_dir, "adapter_config.json")) as f:
         adapter_cfg = json.load(f)
 
@@ -307,6 +327,7 @@ def main():
     adapter_cfg["dpo"] = {
         "start_adapter": cfg["start_adapter"],
         "pairs": len(examples),
+        "picked_by": pickers,
         "beta": beta,
         "learning_rate": cfg["learning_rate"],
         "epochs": cfg["epochs"],
